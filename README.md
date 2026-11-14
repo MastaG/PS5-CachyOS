@@ -7,7 +7,7 @@
 ![KDE Plasma 6.8](https://img.shields.io/badge/KDE_Plasma-6.8-1d99f3)
 ![Wayland](https://img.shields.io/badge/Wayland-yes-2ea44f)
 
-![KDE "About this System" on the PS5: kernel 7.3.4, KDE Plasma 6.8.2 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 14.1 GiB RAM](images/about-this-system-pb33e.png)
+![KDE "About this System" on the PS5: kernel 7.3.4, KDE Plasma 6.8.2 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 14.1 GiB RAM](images/about-this-system-7.3.4.png)
 
 <sub>KDE Plasma on Wayland, kernel 7.3.4, running on the PS5's AMD Oberon APU. KDE says "Arch Linux" because the CachyOS image is Arch with the CachyOS package repo on top.</sub>
 
