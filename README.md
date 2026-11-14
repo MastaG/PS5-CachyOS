@@ -200,7 +200,7 @@ The modes follow your screen, within what the PS5's HDMI chip can do:
 
 **Desktop HDR:** off by default. Turn it on in **System Settings → Display** (*Enable HDR*). Turn it off again if a game runs worse with it.
 
-![KDE Display settings on the PS5: 2560x1440 at 144 Hz, Enable HDR ticked, 12 bits per colour](images/display-hdr.jpg)
+![KDE Display settings on the PS5: 2560x1440 at 144 Hz, Adaptive sync (FreeSync) available, Enable HDR ticked, 12 bits per colour](images/display-hdr.jpg)
 
 **HDMI chip:** the PS5 has one of two HDMI chips. Check yours with `sudo dmesg | grep "HDMI IC"`:
 - **FLAVA3:** HDR and 12-bit colour (4:2:2) work.
