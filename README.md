@@ -3,7 +3,7 @@
 **Run a full Linux desktop and Steam on a jailbroken PS5.** Flash a ready-made image, boot it, play. The rest of this guide covers using it, fixing what can still go wrong, and doing it all by hand on the official image.
 
 ![Firmware 13.60](https://img.shields.io/badge/PS5_firmware-13.60-0070d1)
-![Kernel 7.2.3](https://img.shields.io/badge/kernel-7.2.3-333)
+![Kernel 7.3.4](https://img.shields.io/badge/kernel-7.3.4-333)
 ![KDE Plasma 6.8](https://img.shields.io/badge/KDE_Plasma-6.8-1d99f3)
 ![Wayland](https://img.shields.io/badge/Wayland-yes-2ea44f)
 
@@ -19,8 +19,8 @@
 | **PS5 firmware** | 13.60 |
 | **Linux loader** | [soniciso1's ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases) |
 | **Drive** | 1 TB USB-C SSD, USB-C to USB-C cable |
-| **OS image** | [this guide's image](https://github.com/abrocoma/cachyos-ps5-guide/releases/latest), based on the official [ps5-linux CachyOS image](https://github.com/ps5-linux/ps5-linux-image/releases/tag/latest) |
-| **Kernel** | 7.2.3 + [ps5-linux-patches](https://github.com/ps5-linux/ps5-linux-patches) `5f6b5d3` |
+| **OS image** | [this guide's image](https://github.com/abrocoma/PS5-CachyOS/releases/latest), based on the official [ps5-linux CachyOS image](https://github.com/ps5-linux/ps5-linux-image/releases/tag/latest) |
+| **Kernel** | 7.3.4 + [ps5-linux-patches](https://github.com/ps5-linux/ps5-linux-patches) `b33e7c5` |
 | **Screens** | 1440p 144 Hz monitor, 4K 60 Hz TV |
 
 Big thanks to **[soniciso1](https://github.com/soniciso1)** for the loader with 13.60 support, and to the **[ps5-linux](https://github.com/ps5-linux)** project for the kernel, image and tools. Full list in [Credits](#credits).
@@ -80,26 +80,26 @@ Linux runs entirely from an external SSD. Nothing is installed on the PS5's inte
 > [!CAUTION]
 > Flashing **erases the whole SSD**.
 
-**Download** `ps5-cachyos-7.2.3-p5f6b.img.xz` (2 GB) from [this guide's latest release](https://github.com/abrocoma/cachyos-ps5-guide/releases/latest). It's the official ps5-linux image with every fix from this guide already installed:
+**Download** `ps5-cachyos-7.3.4-pb33e.img.xz` (2 GB) from [this guide's latest release](https://github.com/abrocoma/PS5-CachyOS/releases/latest). It's the official ps5-linux image with every fix from this guide already installed:
 
 | | |
 |---|---|
-| **Display** | No black screens at 1080p/1440p, up to 1440p 144 Hz and 4K 60 Hz, desktop HDR, 12-bit colour |
-| **Gaming Mode** | SteamOS-style Steam, display and network settings in Steam, working **Switch to Desktop** |
-| **Hardware** | Kernel 7.2.3 + ps5-linux-patches `5f6b5d3`, Wi-Fi driver, DualSense reconnect, automatic fan curve |
+| **Display** | No black screens at 1080p/1440p, up to 1440p 144 Hz, 1080p 144 Hz and 4K 60 Hz, FreeSync / VRR, desktop HDR, 12-bit colour (one-click desktop icon) |
+| **Gaming Mode** | SteamOS-style Steam, up to 144 Hz at native resolution ("Gaming Mode Refresh Rate" desktop icon), display and network settings in Steam, working **Switch to Desktop** |
+| **Hardware** | Kernel 7.3.4 + ps5-linux-patches `b33e7c5` (safer GPU hang recovery, clock at boot, webcams/capture cards), Wi-Fi driver, DualSense reconnect, automatic fan curve |
 | **System** | zram swap, boot-order fix, USB SSD boot settings, Chrome video decode flags |
 
 ```sh
-wget https://github.com/abrocoma/cachyos-ps5-guide/releases/download/image-2026-11-10/ps5-cachyos-7.2.3-p5f6b.img.xz
-wget https://github.com/abrocoma/cachyos-ps5-guide/releases/download/image-2026-11-10/ps5-cachyos-7.2.3-p5f6b.img.xz.sha256
-sha256sum -c ps5-cachyos-7.2.3-p5f6b.img.xz.sha256     # must say OK
+wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-14/ps5-cachyos-7.3.4-pb33e.img.xz
+wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-14/ps5-cachyos-7.3.4-pb33e.img.xz.sha256
+sha256sum -c ps5-cachyos-7.3.4-pb33e.img.xz.sha256     # must say OK
 ```
 
 **Flash it:**
 - **Windows / macOS:** extract the `.img.xz` first to get the `.img` (Windows: [7-Zip](https://www.7-zip.org/); macOS: double-click it), then flash the `.img` with [balenaEtcher](https://etcher.balena.io/).
 - **Linux:** find the SSD with `lsblk` (a 1 TB drive shows as ~931G) and write to the **whole disk** (`/dev/sdX`, not `/dev/sdX1`):
   ```sh
-  xzcat ps5-cachyos-7.2.3-p5f6b.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
+  xzcat ps5-cachyos-7.3.4-pb33e.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
   ```
 
 The SSD now has two partitions:
@@ -215,8 +215,8 @@ Changing the resolution can make the TV lose the picture for a moment. Switch th
 **`install.sh`** from this repo checks the core fixes (all already in the image) and offers the extras:
 
 ```sh
-git clone https://github.com/abrocoma/cachyos-ps5-guide
-cd cachyos-ps5-guide
+git clone https://github.com/abrocoma/PS5-CachyOS
+cd PS5-CachyOS
 sudo ./install.sh
 ```
 
