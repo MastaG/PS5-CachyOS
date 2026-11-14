@@ -485,6 +485,5 @@ The old kernel patches (`0001` Bluetooth, `0002`/`0003` 1440p @ 120 Hz) are gone
   - [ps5-linux-patches](https://github.com/ps5-linux/ps5-linux-patches): kernel patches, `.config`, `ps5_vcn.bin`
   - [ps5-linux-mwifiex](https://github.com/ps5-linux/ps5-linux-mwifiex): Wi-Fi driver
   - [ps5-linux-tools](https://github.com/ps5-linux/ps5-linux-tools): boost and fan control
-- **[VivaLaVent/ps5-bazzite-deck](https://github.com/VivaLaVent/ps5-bazzite-deck)**: the 1440p sync fix behind this guide's earlier 1440p @ 120 Hz patch
 
 This repo only collects the fixes I needed on top.
