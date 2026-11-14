@@ -7,7 +7,7 @@
 ![KDE Plasma 6.8](https://img.shields.io/badge/KDE_Plasma-6.8-1d99f3)
 ![Wayland](https://img.shields.io/badge/Wayland-yes-2ea44f)
 
-![KDE "About this System" on the PS5: kernel 7.3.4, KDE Plasma 6.8.2 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 14.1 GiB RAM](images/about-this-system.png)
+![KDE "About this System" on the PS5: kernel 7.3.4, KDE Plasma 6.8.2 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 14.1 GiB RAM](images/about-this-system-pb33e.png)
 
 <sub>KDE Plasma on Wayland, kernel 7.3.4, running on the PS5's AMD Oberon APU. KDE says "Arch Linux" because the CachyOS image is Arch with the CachyOS package repo on top.</sub>
 
@@ -200,7 +200,7 @@ The modes follow your screen, within what the PS5's HDMI chip can do:
 
 **Desktop HDR:** off by default. Turn it on in **System Settings → Display** (*Enable HDR*). Turn it off again if a game runs worse with it.
 
-![KDE Display settings on the PS5: 2560x1440 at 144 Hz, Adaptive sync (FreeSync) available, Enable HDR ticked, 12 bits per colour](images/display-hdr.jpg)
+![KDE Display settings on the PS5: 2560x1440 at 144 Hz, Adaptive sync (FreeSync) available, Enable HDR ticked, 12 bits per colour](images/display-vrr-pb33e.jpg)
 
 **HDMI chip:** the PS5 has one of two HDMI chips. Check yours with `sudo dmesg | grep "HDMI IC"`:
 - **FLAVA3:** HDR and 12-bit colour (4:2:2) work.
