@@ -194,11 +194,21 @@ The modes follow your screen, within what the PS5's HDMI chip can do:
 | Mode | Status |
 |---|---|
 | 1080p @ 60 / 120 Hz | ✅ |
+| 1080p @ 144 Hz | ✅ tested (needs a monitor that offers it) |
 | 1440p @ 60 / 120 / 144 Hz | ✅ tested at 144 Hz |
 | 2160p @ 60 Hz | ✅ tested |
 | 2160p @ 120 Hz | Needs an HDMI 2.1 TV (untested) |
 
-**Desktop HDR:** off by default. Turn it on in **System Settings → Display** (*Enable HDR*). Turn it off again if a game runs worse with it.
+**Desktop HDR:** off by default. Turn it on in **System Settings → Display** (*Enable HDR*). Turn it off again if a game runs worse with it. HDR at 4K needs 12-bit colour: click the **12-bit Colour** icon on the desktop.
+
+**FreeSync / VRR:** the screen's refresh rate follows the game's frame rate, so fps drops stay smooth and don't tear. It's on in the image (`hdmi.vrr=1` in `cmdline.txt`) and needs:
+1. A monitor or TV with **FreeSync over HDMI**. On some monitors (Samsung Odyssey, for example) you have to turn on **Adaptive-Sync / FreeSync** in the monitor's own menu first.
+2. A **60 or 120 Hz** mode. FreeSync doesn't work at 144 Hz on the PS5, because the HDMI chip only follows a variable refresh rate up to 120 Hz.
+3. **System Settings → Display → Adaptive sync:** *Automatic* (fullscreen games only, recommended) or *Always*. *Always* can make VA panels flicker on the desktop.
+
+For fast games that already run above 144 fps (CS2, for example), fixed 144 Hz usually feels better than FreeSync at 120 Hz.
+
+**Gaming Mode refresh rate:** Gaming Mode starts at your screen's native resolution and up to 144 Hz. The **Gaming Mode Refresh Rate** icon on the desktop switches it between 144 Hz, 120 Hz (for FreeSync), 60 Hz and the monitor's default.
 
 ![KDE Display settings on the PS5: 2560x1440 at 144 Hz, Adaptive sync (FreeSync) available, Enable HDR ticked, 12 bits per colour](images/display-vrr-pb33e.jpg)
 
