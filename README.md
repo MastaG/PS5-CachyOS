@@ -177,6 +177,10 @@ The PS5 boots into **Gaming Mode**: Steam's console interface, as on SteamOS.
 - **Back to Gaming Mode:** the **Return to Gaming Mode** icon on the desktop.
 - **Display and network settings** are in Steam's settings, as on a Steam Deck.
 - **OS updates:** Steam says it's up to date because CachyOS isn't updated through Steam. Use `sudo pacman -Syu` on the desktop.
+- **Kernel updates:** `pacman` doesn't update the PS5 kernel. Get the newest one without reflashing (the old one is kept for `--rollback`):
+  ```
+  curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh
+  ```
 
 ![Steam's power menu with Switch to Desktop](images/switch-to-desktop.jpg)
 
@@ -465,6 +469,8 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `install.sh` | Checks the core fixes, offers the extras | 6, 11 |
 | `scripts/boot-to-desktop.sh` | Pick `plasma` or `gamescope` for the next boot | 4 |
 | `scripts/fix-black-screen.sh` | TTY switch + link re-lock + double hotplug | 7 |
+| `scripts/update-kernel.sh` | Installs the newest PS5 kernel without reflashing, `--rollback` to undo | 4 |
+| `scripts/quiet-fan.sh` | Quieter fan curve + SoC temperature in the panel, `--remove` to undo | 6 |
 | `files/usr/local/bin/dp-link-lock` | Locks the display link to 4 lanes HBR3 | 7, 11 |
 | `files/etc/systemd/system/dp-link-lock.service` | Runs it before the display starts | 7, 11 |
 | `files/etc/systemd/system/bt-connectable.service` | Lets the DualSense reconnect | 9, 11 |
