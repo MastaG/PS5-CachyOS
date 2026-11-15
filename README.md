@@ -177,10 +177,7 @@ The PS5 boots into **Gaming Mode**: Steam's console interface, as on SteamOS.
 - **Back to Gaming Mode:** the **Return to Gaming Mode** icon on the desktop.
 - **Display and network settings** are in Steam's settings, as on a Steam Deck.
 - **OS updates:** Steam says it's up to date because CachyOS isn't updated through Steam. Use `sudo pacman -Syu` on the desktop.
-- **Kernel updates:** `pacman` doesn't update the PS5 kernel. Get the newest one without reflashing (the old one is kept for `--rollback`):
-  ```
-  curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh
-  ```
+- **Kernel updates:** `pacman` doesn't update the PS5 kernel, see [Updating the kernel](#updating-the-kernel) below.
 
 ![Steam's power menu with Switch to Desktop](images/switch-to-desktop.jpg)
 
@@ -188,6 +185,21 @@ The PS5 boots into **Gaming Mode**: Steam's console interface, as on SteamOS.
 > **Steam's Restart** is a real reboot, so it takes you back to PS5 OS like any reboot.
 
 Want the desktop on every boot instead? `echo plasma > ~/.config/ps5-next-session` (or `./scripts/boot-to-desktop.sh`), and `gamescope` to switch back.
+
+### Updating the kernel
+
+Get the newest PS5 kernel without reflashing (currently **7.3.4-pb33e**, the same as the 2026-11-14 image). On the desktop, run:
+
+```
+curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh
+```
+
+Then restart and boot Linux as usual; `uname -r` shows the new version.
+
+- **What it changes:** `/boot/efi/bzImage` + `initrd.img` (the old ones are kept as `.bak`) and the kernel's modules, incl. the Wi-Fi driver. Your files, apps, settings and `cmdline.txt` stay as they are.
+- **Undo:** the same line with `| sudo sh -s -- --rollback` at the end puts the previous kernel back.
+- **FreeSync and 1080p 144 Hz** also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt` (the 2026-11-14 image has them; the script reminds you if they're missing).
+- **The files** are in [`kernel/`](kernel): kernel + modules taken unchanged from the image, plus a checksum the script verifies.
 
 <sub>[↑ Back to contents](#contents)</sub>
 
@@ -470,6 +482,7 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `scripts/boot-to-desktop.sh` | Pick `plasma` or `gamescope` for the next boot | 4 |
 | `scripts/fix-black-screen.sh` | TTY switch + link re-lock + double hotplug | 7 |
 | `scripts/update-kernel.sh` | Installs the newest PS5 kernel without reflashing, `--rollback` to undo | 4 |
+| `kernel/ps5-kernel-*.tar.zst` | Newest PS5 kernel + modules for `update-kernel.sh`, with `.sha256` | 4 |
 | `scripts/quiet-fan.sh` | Quieter fan curve + SoC temperature in the panel, `--remove` to undo | 6 |
 | `files/usr/local/bin/dp-link-lock` | Locks the display link to 4 lanes HBR3 | 7, 11 |
 | `files/etc/systemd/system/dp-link-lock.service` | Runs it before the display starts | 7, 11 |

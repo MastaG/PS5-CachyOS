@@ -1,5 +1,5 @@
 #!/bin/sh
-# PS5 CachyOS: install the newest kernel from the PS5-CachyOS releases without reflashing.
+# PS5 CachyOS: install the newest kernel from the PS5-CachyOS repo (kernel/) without reflashing.
 #
 # Update:    curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh
 # Roll back: curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --rollback
@@ -11,9 +11,8 @@
 set -eu
 
 KVER=7.3.4-pb33e
-TAG=kernel-$KVER
 PKG=ps5-kernel-$KVER.tar.zst
-URL=${PS5_KERNEL_URL:-https://github.com/abrocoma/PS5-CachyOS/releases/download/$TAG}
+URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/kernel}
 BOOT=${PS5_BOOT:-/boot/efi}
 
 die() { echo "ERROR: $*" >&2; exit 1; }
