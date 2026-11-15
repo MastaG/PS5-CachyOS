@@ -6,8 +6,9 @@
 #
 # Installs the kernel (bzImage), its modules (incl. the Wi-Fi driver) and builds a
 # new initrd. The current kernel + initrd are kept as bzImage.bak / initrd.img.bak
-# so --rollback can put them back. Your files, apps, settings and cmdline.txt are
-# not touched.
+# so --rollback can put them back. On older images it also updates the 12-bit
+# colour script for kernel 7.3 (old one kept as .bak). Your files, apps, settings
+# and cmdline.txt are not touched.
 set -eu
 
 KVER=7.3.4-pb33e
@@ -75,6 +76,29 @@ mkinitcpio -k "$KVER" -g "$T/initrd.img" >"$T/mkinitcpio.log" 2>&1 || {
 	tail -20 "$T/mkinitcpio.log" >&2
 	die "building the initrd failed. Your boot files were NOT changed; the current kernel still boots."
 }
+
+# Older images (2026-11-10) have a 12-bit colour script that only knows the
+# kernel 7.2 setting name; kernel 7.3 renamed it. The new one handles both.
+CD=/usr/local/bin/ps5-color-depth
+if [ -f "$CD" ] && ! grep -q force_yuv_pixel_format "$CD"; then
+	echo "Updating the 12-bit colour script for kernel 7.3 (old one kept as .bak)..."
+	cp "$CD" "$CD.bak"
+	cat > "$CD" <<'EOF'
+#!/bin/sh
+# 12-bit 4:2:2 output to the PS5 HDMI bridge (same as Ubuntu's ps5-max-bpc)
+# Kernel 7.3 renamed force_yuv422_output (1 = on) to force_yuv_pixel_format (2 = YCbCr 4:2:2).
+d=/sys/kernel/debug/dri/0/DP-1
+mountpoint -q /sys/kernel/debug || mount -t debugfs none /sys/kernel/debug
+for i in $(seq 60); do [ -e "$d/max_bpc" ] && break; sleep 0.5; done
+echo c > "$d/max_bpc"
+if [ -e "$d/force_yuv_pixel_format" ]; then
+    echo 2 > "$d/force_yuv_pixel_format"
+else
+    echo 1 > "$d/force_yuv422_output"
+fi
+EOF
+	chmod 755 "$CD"
+fi
 
 echo "Swapping boot files (old ones kept as .bak)..."
 cp "$BOOT/bzImage" "$BOOT/bzImage.bak"

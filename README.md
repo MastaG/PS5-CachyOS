@@ -196,7 +196,7 @@ curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/u
 
 Then restart and boot Linux as usual; `uname -r` shows the new version.
 
-- **What it changes:** `/boot/efi/bzImage` + `initrd.img` (the old ones are kept as `.bak`) and the kernel's modules, incl. the Wi-Fi driver. Your files, apps, settings and `cmdline.txt` stay as they are.
+- **What it changes:** `/boot/efi/bzImage` + `initrd.img` (the old ones are kept as `.bak`) and the kernel's modules, incl. the Wi-Fi driver. On the 2026-11-10 image it also updates the 12-bit colour script, which kernel 7.3 needs. Your files, apps, settings and `cmdline.txt` stay as they are.
 - **Undo:** the same line with `| sudo sh -s -- --rollback` at the end puts the previous kernel back.
 - **FreeSync and 1080p 144 Hz** also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt` (the 2026-11-14 image has them; the script reminds you if they're missing).
 - **The files** are in [`kernel/`](kernel): kernel + modules taken unchanged from the image, plus a checksum the script verifies.
