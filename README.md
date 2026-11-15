@@ -201,6 +201,19 @@ Then restart and boot Linux as usual; `uname -r` shows the new version.
 - **FreeSync and 1080p 144 Hz** also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt` (the 2026-11-14 image has them; the script reminds you if they're missing).
 - **The files** are in [`kernel/`](kernel): kernel + modules taken unchanged from the image, plus a checksum the script verifies.
 
+### Getting the 2026-11-14 extras
+
+On the 2026-11-10 image, this adds the two new desktop icons without reflashing:
+
+```
+curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh
+```
+
+- **Gaming Mode Refresh Rate:** choose 144, 120 (for FreeSync), 60 Hz or the monitor default. Gaming Mode starts at 144 Hz until you pick something else.
+- **12-bit Colour:** sets the colour resolution to 12 bits, needed for HDR at 4K.
+- **What it changes:** the Gaming Mode launcher `/usr/bin/gamescope-session-ps5` (the old one is kept as `.bak-extras`), plus two small scripts in `/usr/local/bin` and the icons on your desktop. If you edited the launcher yourself, it stops and changes nothing.
+- **Undo:** the same line with `| sudo sh -s -- --rollback` at the end.
+
 <sub>[↑ Back to contents](#contents)</sub>
 
 ## 5. Display: resolutions, refresh rates and HDR
@@ -482,6 +495,7 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `scripts/boot-to-desktop.sh` | Pick `plasma` or `gamescope` for the next boot | 4 |
 | `scripts/fix-black-screen.sh` | TTY switch + link re-lock + double hotplug | 7 |
 | `scripts/update-kernel.sh` | Installs the newest PS5 kernel without reflashing, `--rollback` to undo | 4 |
+| `scripts/update-extras.sh` | Adds the 2026-11-14 desktop icons (Gaming Mode refresh rate, 12-bit colour) to older installs, `--rollback` to undo | 4 |
 | `kernel/ps5-kernel-*.tar.zst` | Newest PS5 kernel + modules for `update-kernel.sh`, with `.sha256` | 4 |
 | `scripts/quiet-fan.sh` | Quieter fan curve + SoC temperature in the panel, `--remove` to undo | 6 |
 | `files/usr/local/bin/dp-link-lock` | Locks the display link to 4 lanes HBR3 | 7, 11 |
