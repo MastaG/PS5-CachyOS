@@ -177,7 +177,7 @@ The PS5 boots into **Gaming Mode**: Steam's console interface, as on SteamOS.
 - **Back to Gaming Mode:** the **Return to Gaming Mode** icon on the desktop.
 - **Display and network settings** are in Steam's settings, as on a Steam Deck.
 - **OS updates:** Steam says it's up to date because CachyOS isn't updated through Steam. Use `sudo pacman -Syu` on the desktop.
-- **Kernel updates:** `pacman` doesn't update the PS5 kernel, see [Updating the kernel](#updating-the-kernel) below.
+- **Kernel and image updates:** `pacman` doesn't update the PS5 kernel or the image's extras, see [Updating everything](#updating-everything-recommended) below.
 
 ![Steam's power menu with Switch to Desktop](images/switch-to-desktop.jpg)
 
@@ -185,6 +185,25 @@ The PS5 boots into **Gaming Mode**: Steam's console interface, as on SteamOS.
 > **Steam's Restart** is a real reboot, so it takes you back to PS5 OS like any reboot.
 
 Want the desktop on every boot instead? `echo plasma > ~/.config/ps5-next-session` (or `./scripts/boot-to-desktop.sh`), and `gamescope` to switch back.
+
+### Updating everything (recommended)
+
+One command brings an older install up to the newest release, no reflash. Run it on the desktop as your normal user (**without** `sudo`, it asks for the password itself):
+
+```
+curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update.sh | sh
+```
+
+It runs these steps in order, then you restart:
+
+1. **Kernel:** the newest PS5 kernel (see [Updating the kernel](#updating-the-kernel)).
+2. **Gaming Mode extras:** the refresh rate menu and the 12-bit Colour icon (see [below](#getting-the-2026-11-14-extras)). Skipped on installs that don't have this image's Gaming Mode.
+3. **FreeSync and 1080p 144 Hz:** asks first, then adds the two boot options to `cmdline.txt` (the old file is kept as `cmdline.txt.bak-update`).
+4. **Quiet fan curve:** asks first, default no (see [section 6](#6-extras-boost-fan-video-and-dns)).
+
+**Undo:** the same line with `| sh -s -- --rollback` at the end.
+
+The single-step commands below still work if you only want one part.
 
 ### Updating the kernel
 
@@ -494,6 +513,7 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `install.sh` | Checks the core fixes, offers the extras | 6, 11 |
 | `scripts/boot-to-desktop.sh` | Pick `plasma` or `gamescope` for the next boot | 4 |
 | `scripts/fix-black-screen.sh` | TTY switch + link re-lock + double hotplug | 7 |
+| `scripts/update.sh` | Updates an existing install to the newest release in one go (kernel, extras, FreeSync, optional fan curve), `--rollback` to undo | 4 |
 | `scripts/update-kernel.sh` | Installs the newest PS5 kernel without reflashing, `--rollback` to undo | 4 |
 | `scripts/update-extras.sh` | Adds the 2026-11-14 desktop icons (Gaming Mode refresh rate, 12-bit colour) to older installs, `--rollback` to undo | 4 |
 | `kernel/ps5-kernel-*.tar.zst` | Newest PS5 kernel + modules for `update-kernel.sh`, with `.sha256` | 4 |
