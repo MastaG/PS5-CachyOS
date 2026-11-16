@@ -200,6 +200,7 @@ It runs these steps in order, then you restart:
 2. **Gaming Mode extras:** the refresh rate menu and the 12-bit Colour icon (see [below](#getting-the-2026-11-14-extras)). Skipped on installs that don't have this image's Gaming Mode.
 3. **FreeSync and 1080p 144 Hz:** asks first, then adds the two boot options to `cmdline.txt` (the old file is kept as `cmdline.txt.bak-update`).
 4. **Quiet fan curve:** asks first, default no (see [section 6](#6-extras-boost-fan-video-and-dns)).
+5. **Updater:** adds an **Update PS5 CachyOS** icon to the desktop and app menu, and a daily check that shows a notification when a newer kernel is out. After the first run, updating is just a click on that icon.
 
 **Undo:** the same line with `| sh -s -- --rollback` at the end.
 
@@ -513,7 +514,7 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `install.sh` | Checks the core fixes, offers the extras | 6, 11 |
 | `scripts/boot-to-desktop.sh` | Pick `plasma` or `gamescope` for the next boot | 4 |
 | `scripts/fix-black-screen.sh` | TTY switch + link re-lock + double hotplug | 7 |
-| `scripts/update.sh` | Updates an existing install to the newest release in one go (kernel, extras, FreeSync, optional fan curve), `--rollback` to undo | 4 |
+| `scripts/update.sh` | Updates an existing install to the newest release in one go (kernel, extras, FreeSync, optional fan curve) and adds an update icon + daily update check, `--rollback` to undo | 4 |
 | `scripts/update-kernel.sh` | Installs the newest PS5 kernel without reflashing, `--rollback` to undo | 4 |
 | `scripts/update-extras.sh` | Adds the 2026-11-14 desktop icons (Gaming Mode refresh rate, 12-bit colour) to older installs, `--rollback` to undo | 4 |
 | `kernel/ps5-kernel-*.tar.zst` | Newest PS5 kernel + modules for `update-kernel.sh`, with `.sha256` | 4 |

@@ -11,6 +11,8 @@
 #                         (only on installs from the 2026-11-10 image or newer; skipped otherwise)
 #   3. FreeSync + 1080p 144 Hz boot options (asks first)
 #   4. quiet-fan.sh       quieter fan curve + SoC Temp in the panel (asks first, default no)
+#   5. Updater:           "Update PS5 CachyOS" icon (runs this script) + a daily check that
+#                         shows a notification when a newer kernel is out
 # Each step keeps backups, so --rollback undoes all of it.
 set -u
 
@@ -28,6 +30,76 @@ ask() { # ask "question" default(y|n)
 	case "${a:-$d}" in y|Y|yes|Yes) return 0 ;; *) return 1 ;; esac
 }
 fetch() { curl -fsSL "$R/$1" || die "couldn't download $1 (are you online?)"; }
+
+DESK=$(xdg-user-dir DESKTOP 2>/dev/null || true); [ -n "$DESK" ] && [ "$DESK" != "$HOME" ] || DESK="$HOME/Desktop"
+UBIN="$HOME/.local/bin"; UNIT="$HOME/.config/systemd/user"; APPS="$HOME/.local/share/applications"
+
+install_updater() {
+	mkdir -p "$UBIN" "$UNIT" "$APPS" "$DESK"
+	cat > "$UBIN/ps5-update" <<PS5EOF
+#!/bin/sh
+# Runs the newest PS5 CachyOS updater from GitHub.
+curl -fsSL $R/update.sh | sh
+echo
+printf 'Press Enter to close'; read _
+PS5EOF
+	cat > "$UBIN/ps5-update-check" <<'PS5EOF'
+#!/bin/sh
+# Shows a notification when a newer PS5 kernel is available (once per version).
+new=$(curl -fsSL --max-time 30 https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sed -n 's/^KVER=//p' | head -1)
+cur=$(uname -r)
+[ -n "$new" ] && [ "$new" != "$cur" ] || exit 0
+[ "$(printf '%s\n%s\n' "$new" "$cur" | sort -V | tail -1)" = "$new" ] || exit 0
+seen="$HOME/.cache/ps5-update-notified"
+[ "$(cat "$seen" 2>/dev/null)" = "$new" ] && exit 0
+mkdir -p "$HOME/.cache"
+notify-send -a "PS5 CachyOS" -i system-software-update "PS5 CachyOS update available" \
+	"Kernel $new is out (you have $cur). Open \"Update PS5 CachyOS\" on the desktop." && echo "$new" > "$seen"
+PS5EOF
+	chmod 755 "$UBIN/ps5-update" "$UBIN/ps5-update-check"
+	for f in "$DESK/ps5-update.desktop" "$APPS/ps5-update.desktop"; do
+		cat > "$f" <<PS5EOF
+[Desktop Entry]
+Type=Application
+Name=Update PS5 CachyOS
+Comment=Install the newest PS5 kernel, fixes and extras
+Exec=konsole -e $UBIN/ps5-update
+Icon=system-software-update
+Terminal=false
+Categories=System;
+PS5EOF
+		chmod 755 "$f"
+	done
+	cat > "$UNIT/ps5-update-check.service" <<PS5EOF
+[Unit]
+Description=Check for a newer PS5 CachyOS kernel
+[Service]
+Type=oneshot
+ExecStart=$UBIN/ps5-update-check
+PS5EOF
+	cat > "$UNIT/ps5-update-check.timer" <<'PS5EOF'
+[Unit]
+Description=Daily check for a newer PS5 CachyOS kernel
+[Timer]
+OnActiveSec=3min
+OnUnitActiveSec=1d
+Persistent=true
+[Install]
+WantedBy=timers.target
+PS5EOF
+	systemctl --user daemon-reload 2>/dev/null
+	systemctl --user enable --now ps5-update-check.timer >/dev/null 2>&1 &&
+		echo "Added the \"Update PS5 CachyOS\" icon and a daily update check." ||
+		echo "Added the \"Update PS5 CachyOS\" icon (the daily check couldn't be switched on)."
+}
+
+remove_updater() {
+	systemctl --user disable --now ps5-update-check.timer >/dev/null 2>&1
+	rm -f "$UNIT/ps5-update-check.service" "$UNIT/ps5-update-check.timer" "$UBIN/ps5-update" "$UBIN/ps5-update-check" \
+		"$DESK/ps5-update.desktop" "$APPS/ps5-update.desktop" "$HOME/.cache/ps5-update-notified"
+	systemctl --user daemon-reload 2>/dev/null
+	echo "Removed the updater icon and the daily check."
+}
 
 [ "$(id -u)" != 0 ] || die "run it as your normal user, without sudo (it asks for the password itself)."
 grep -q 'console=ttyTitania0' /proc/cmdline || die "this doesn't look like Linux on a PS5. Nothing changed."
@@ -47,6 +119,8 @@ if [ "${1:-}" = "--rollback" ]; then
 	if [ -x /usr/local/sbin/ps5-fan-curve ] && ask "Also remove the quiet fan curve?" n; then
 		fetch quiet-fan.sh | sh -s -- --remove
 	fi
+	say "Updater"
+	remove_updater
 	echo; echo "Done. Restart to boot the previous kernel."
 	exit 0
 fi
@@ -55,17 +129,17 @@ echo "PS5 CachyOS updater: kernel, fixes and extras from the newest release."
 echo "Your files, apps and settings are not touched. Password needed:"
 sudo -v || exit 1
 
-say "1/4 Kernel"
+say "1/5 Kernel"
 if ! fetch update-kernel.sh | sudo sh; then
 	die "the kernel update failed (see above). Nothing else was changed."
 fi
 
-say "2/4 Gaming Mode extras"
+say "2/5 Gaming Mode extras"
 if ! fetch update-extras.sh | sudo sh; then
 	echo "Skipped: this install doesn't have the Gaming Mode these extras need (it's fine)."
 fi
 
-say "3/4 FreeSync and 1080p 144 Hz"
+say "3/5 FreeSync and 1080p 144 Hz"
 if grep -q 'hdmi.vrr=1' "$CMD" 2>/dev/null; then
 	echo "Already on."
 elif [ ! -f "$CMD" ]; then
@@ -78,7 +152,7 @@ else
 	echo "Left off. You can run this updater again later."
 fi
 
-say "4/4 Quiet fan curve (optional)"
+say "4/5 Quiet fan curve (optional)"
 if [ -x /usr/local/sbin/ps5-fan-curve ]; then
 	echo "Already installed."
 elif ask "Install the quieter fan curve? The console runs warmer in games; watch temps on stock paste." n; then
@@ -87,6 +161,10 @@ else
 	echo "Skipped (kernel default curve stays)."
 fi
 
+say "5/5 Updater"
+install_updater
+
 echo
-echo "All done. Restart the PS5 Linux to use the new kernel."
+echo "All done. Restart the PS5 Linux to use the new kernel (if it changed)."
+echo "Next time, just open \"Update PS5 CachyOS\" on the desktop."
 echo "To undo:  curl -fsSL $R/update.sh | sh -s -- --rollback"
