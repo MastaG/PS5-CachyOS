@@ -7,7 +7,7 @@
 ![KDE Plasma 6.8](https://img.shields.io/badge/KDE_Plasma-6.8-1d99f3)
 ![Wayland](https://img.shields.io/badge/Wayland-yes-2ea44f)
 
-![KDE "About this System" on the PS5: kernel 7.3.4, KDE Plasma 6.8.2 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 14.1 GiB RAM](images/about-this-system-7.3.4.png)
+![KDE "About this System" on the PS5: kernel 7.3.4-p1472, KDE Plasma 6.8.2 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 13.7 GiB RAM](images/about-this-system-p1472.png)
 
 <sub>KDE Plasma on Wayland, kernel 7.3.4, running on the PS5's AMD Oberon APU. KDE says "Arch Linux" because the CachyOS image is Arch with the CachyOS package repo on top.</sub>
 
@@ -193,6 +193,8 @@ One command brings an older install up to the newest release, no reflash. Run it
 ```
 curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update.sh | sh
 ```
+
+![The updater on the desktop: all six steps done, with the "Update PS5 CachyOS" icon among the desktop icons](images/updater-p1472.jpg)
 
 It runs these steps in order, then you restart:
 
