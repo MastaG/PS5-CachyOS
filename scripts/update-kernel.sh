@@ -77,16 +77,24 @@ mkinitcpio -k "$KVER" -g "$T/initrd.img" >"$T/mkinitcpio.log" 2>&1 || {
 	die "building the initrd failed. Your boot files were NOT changed; the current kernel still boots."
 }
 
-# Older images (2026-11-10) have a 12-bit colour script that only knows the
-# kernel 7.2 setting name; kernel 7.3 renamed it. The new one handles both.
+# The 12-bit colour script: older versions only knew the kernel 7.2 setting
+# name, and forced 4:2:2 on every console (tints PS5 Slim / VERDE). The new one
+# handles both names and only touches FLAVA3.
 CD=/usr/local/bin/ps5-color-depth
-if [ -f "$CD" ] && ! grep -q force_yuv_pixel_format "$CD"; then
-	echo "Updating the 12-bit colour script for kernel 7.3 (old one kept as .bak)..."
+if [ -f "$CD" ] && ! grep -q 'HDMI IC Type' "$CD"; then
+	echo "Updating the 12-bit colour script (old one kept as .bak)..."
 	cp "$CD" "$CD.bak"
 	cat > "$CD" <<'EOF'
 #!/bin/sh
-# 12-bit 4:2:2 output to the PS5 HDMI bridge (same as Ubuntu's ps5-max-bpc)
+# 12-bit 4:2:2 output to the PS5 HDMI bridge, FLAVA3 only (PS5 Fat).
+# VERDE (PS5 Slim) only supports 8-bit RGB: forcing 4:2:2 there gives a
+# yellow/red tint, so other chips keep the kernel's default output.
 # Kernel 7.3 renamed force_yuv422_output (1 = on) to force_yuv_pixel_format (2 = YCbCr 4:2:2).
+ic=$(dmesg 2>/dev/null | sed -n 's/.*HDMI IC Type \[\([A-Za-z0-9]*\)\].*/\1/p' | head -1)
+if [ "$ic" != FLAVA3 ]; then
+    echo "HDMI chip ${ic:-unknown}: keeping the default 8-bit RGB output"
+    exit 0
+fi
 d=/sys/kernel/debug/dri/0/DP-1
 mountpoint -q /sys/kernel/debug || mount -t debugfs none /sys/kernel/debug
 for i in $(seq 60); do [ -e "$d/max_bpc" ] && break; sleep 0.5; done

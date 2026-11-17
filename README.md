@@ -197,6 +197,7 @@ curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/u
 It runs these steps in order, then you restart:
 
 1. **Kernel:** the newest PS5 kernel (see [Updating the kernel](#updating-the-kernel)).
+1. **Fixes:** for example the colour tint on the PS5 Slim (VERDE): the 12-bit colour script now only runs on the PS5 Fat (FLAVA3).
 2. **Gaming Mode extras:** the refresh rate menu and the 12-bit Colour icon (see [below](#getting-the-2026-11-14-extras)). Skipped on installs that don't have this image's Gaming Mode.
 3. **FreeSync and 1080p 144 Hz:** asks first, then adds the two boot options to `cmdline.txt` (the old file is kept as `cmdline.txt.bak-update`).
 4. **Quiet fan curve:** asks first, default no (see [section 6](#6-extras-boost-fan-video-and-dns)).
