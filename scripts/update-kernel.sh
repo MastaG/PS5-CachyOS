@@ -11,7 +11,7 @@
 # and cmdline.txt are not touched.
 set -eu
 
-KVER=7.3.4-pb33e
+KVER=7.3.4-p1472
 PKG=ps5-kernel-$KVER.tar.zst
 URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/kernel}
 BOOT=${PS5_BOOT:-/boot/efi}
@@ -21,9 +21,16 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 [ "$(id -u)" = 0 ] || die "run it with sudo (see the top of this script)."
 grep -q 'console=ttyTitania0' /proc/cmdline || die "this doesn't look like Linux on a PS5. Nothing changed."
 [ -f "$BOOT/bzImage" ] && [ -f "$BOOT/initrd.img" ] || die "no $BOOT/bzImage + initrd.img found (boot partition not mounted?). Nothing changed."
+# With two PS5 Linux drives plugged in, /boot/efi can be the OTHER drive's boot partition
+# (both are labelled "boot"). Never write the kernel to another drive.
+if [ -z "${PS5_BOOT:-}" ]; then
+	rdisk=$(lsblk -no PKNAME "$(findmnt -no SOURCE /)" 2>/dev/null || true)
+	bdisk=$(lsblk -no PKNAME "$(findmnt -no SOURCE "$BOOT")" 2>/dev/null || true)
+	[ -n "$rdisk" ] && [ "$rdisk" = "$bdisk" ] || die "$BOOT is on another drive ($bdisk) than this system (${rdisk:-?}). Unplug the other PS5 Linux drive and restart, then run this again. Nothing changed."
+fi
 
 if [ "${1:-}" = "--rollback" ]; then
-	[ -f "$BOOT/bzImage.bak" ] && [ -f "$BOOT/initrd.img.bak" ] || die "no backup kernel found in $BOOT."
+	[ -s "$BOOT/bzImage.bak" ] && [ -s "$BOOT/initrd.img.bak" ] || die "no (complete) backup kernel found in $BOOT."
 	for f in bzImage initrd.img; do
 		mv "$BOOT/$f" "$BOOT/$f.tmp"; mv "$BOOT/$f.bak" "$BOOT/$f"; mv "$BOOT/$f.tmp" "$BOOT/$f.bak"
 	done
@@ -106,6 +113,14 @@ else
 fi
 EOF
 	chmod 755 "$CD"
+fi
+
+# Wi-Fi driver 6e87c85+: follow the router's country (driver default ignores it).
+MP=/etc/modprobe.d/ps5-iw620.conf
+if [ -f "$MP" ] && grep -q '^options moal' "$MP" && ! grep -q 'country_ie_ignore' "$MP"; then
+	cp "$MP" "$MP.bak"
+	sed -i '/^options moal/ s/$/ country_ie_ignore=0 beacon_hints=0/' "$MP"
+	echo "Wi-Fi: now follows your router's country setting (old config kept as $MP.bak)."
 fi
 
 echo "Swapping boot files (old ones kept as .bak)..."

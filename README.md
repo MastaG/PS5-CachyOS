@@ -20,7 +20,7 @@
 | **Linux loader** | [soniciso1's ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases) |
 | **Drive** | 1 TB USB-C SSD, USB-C to USB-C cable |
 | **OS image** | [this guide's image](https://github.com/abrocoma/PS5-CachyOS/releases/latest), based on the official [ps5-linux CachyOS image](https://github.com/ps5-linux/ps5-linux-image/releases/tag/latest) |
-| **Kernel** | 7.3.4 + [ps5-linux-patches](https://github.com/ps5-linux/ps5-linux-patches) `b33e7c5` |
+| **Kernel** | 7.3.4 + [ps5-linux-patches](https://github.com/ps5-linux/ps5-linux-patches) `1472828` |
 | **Screens** | 1440p 144 Hz monitor, 4K 60 Hz TV |
 
 Big thanks to **[soniciso1](https://github.com/soniciso1)** for the loader with 13.60 support, and to the **[ps5-linux](https://github.com/ps5-linux)** project for the kernel, image and tools. Full list in [Credits](#credits).
@@ -80,26 +80,26 @@ Linux runs entirely from an external SSD. Nothing is installed on the PS5's inte
 > [!CAUTION]
 > Flashing **erases the whole SSD**.
 
-**Download** `ps5-cachyos-7.3.4-pb33e.img.xz` (2 GB) from [this guide's latest release](https://github.com/abrocoma/PS5-CachyOS/releases/latest). It's the official ps5-linux image with every fix from this guide already installed:
+**Download** `ps5-cachyos-7.3.4-p1472.img.xz` (2 GB) from [this guide's latest release](https://github.com/abrocoma/PS5-CachyOS/releases/latest). It's the official ps5-linux image with every fix from this guide already installed:
 
 | | |
 |---|---|
 | **Display** | No black screens at 1080p/1440p, up to 1440p 144 Hz, 1080p 144 Hz and 4K 60 Hz, FreeSync / VRR, desktop HDR, 12-bit colour (one-click desktop icon) |
 | **Gaming Mode** | SteamOS-style Steam, up to 144 Hz at native resolution ("Gaming Mode Refresh Rate" desktop icon), display and network settings in Steam, working **Switch to Desktop** |
-| **Hardware** | Kernel 7.3.4 + ps5-linux-patches `b33e7c5` (safer GPU hang recovery, clock at boot, webcams/capture cards), Wi-Fi driver, DualSense reconnect, automatic fan curve |
-| **System** | zram swap, boot-order fix, USB SSD boot settings, Chrome video decode flags |
+| **Hardware** | Kernel 7.3.4 + ps5-linux-patches `1472828` (Bluetooth, power-off and GPU clock fixes, safer GPU hang recovery, clock at boot, webcams/capture cards), Wi-Fi driver, DualSense reconnect, quiet fan curve + SoC temperature in the panel |
+| **System** | "Update PS5 CachyOS" icon + daily update check, zram swap, boot-order fix, USB SSD boot settings, Chrome video decode flags |
 
 ```sh
-wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-14/ps5-cachyos-7.3.4-pb33e.img.xz
-wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-14/ps5-cachyos-7.3.4-pb33e.img.xz.sha256
-sha256sum -c ps5-cachyos-7.3.4-pb33e.img.xz.sha256     # must say OK
+wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-17/ps5-cachyos-7.3.4-p1472.img.xz
+wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-17/ps5-cachyos-7.3.4-p1472.img.xz.sha256
+sha256sum -c ps5-cachyos-7.3.4-p1472.img.xz.sha256     # must say OK
 ```
 
 **Flash it:**
 - **Windows / macOS:** extract the `.img.xz` first to get the `.img` (Windows: [7-Zip](https://www.7-zip.org/); macOS: double-click it), then flash the `.img` with [balenaEtcher](https://etcher.balena.io/).
 - **Linux:** find the SSD with `lsblk` (a 1 TB drive shows as ~931G) and write to the **whole disk** (`/dev/sdX`, not `/dev/sdX1`):
   ```sh
-  xzcat ps5-cachyos-7.3.4-pb33e.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
+  xzcat ps5-cachyos-7.3.4-p1472.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
   ```
 
 The SSD now has two partitions:
@@ -209,7 +209,7 @@ The single-step commands below still work if you only want one part.
 
 ### Updating the kernel
 
-Get the newest PS5 kernel without reflashing (currently **7.3.4-pb33e**, the same as the 2026-11-14 image). On the desktop, run:
+Get the newest PS5 kernel without reflashing (currently **7.3.4-p1472**, the same as the 2026-11-17 image). On the desktop, run:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh
@@ -219,7 +219,7 @@ Then restart and boot Linux as usual; `uname -r` shows the new version.
 
 - **What it changes:** `/boot/efi/bzImage` + `initrd.img` (the old ones are kept as `.bak`) and the kernel's modules, incl. the Wi-Fi driver. On the 2026-11-10 image it also updates the 12-bit colour script, which kernel 7.3 needs. Your files, apps, settings and `cmdline.txt` stay as they are.
 - **Undo:** the same line with `| sudo sh -s -- --rollback` at the end puts the previous kernel back.
-- **FreeSync and 1080p 144 Hz** also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt` (the 2026-11-14 image has them; the script reminds you if they're missing).
+- **FreeSync and 1080p 144 Hz** also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt` (the 2026-11-14 image and newer have them; the script reminds you if they're missing).
 - **The files** are in [`kernel/`](kernel): kernel + modules taken unchanged from the image, plus a checksum the script verifies.
 
 ### Getting the 2026-11-14 extras
@@ -291,7 +291,7 @@ sudo ./install.sh
 
 `sudo ./install.sh -y` installs every extra that isn't installed yet.
 
-**Fan:** the kernel runs the fan on its own temperature curve from boot (`ps5_fan` in `/sys/class/hwmon`). Nothing to install. Don't run ps5-linux-tools' `ps5fan` service alongside it: `ps5_control --fan on` overrides the curve and pins the fan loud. `install.sh` only enables `ps5boost` when the kernel has its own fan control.
+**Fan:** the kernel runs the fan on its own temperature curve from boot (`ps5_fan` in `/sys/class/hwmon`). The 2026-11-17 image sets the quieter curve below at boot (`ps5-fan-curve.service`) and shows a "SoC Temp" reading in the panel. On older installs, `scripts/quiet-fan.sh` adds both; `quiet-fan.sh --remove` goes back to the kernel's default curve. Don't run ps5-linux-tools' `ps5fan` service alongside it: `ps5_control --fan on` overrides the curve and pins the fan loud. `install.sh` only enables `ps5boost` when the kernel has its own fan control.
 
 <details>
 <summary>Changing the fan curve</summary>

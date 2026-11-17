@@ -46,11 +46,11 @@ printf 'Press Enter to close'; read _
 PS5EOF
 	cat > "$UBIN/ps5-update-check" <<'PS5EOF'
 #!/bin/sh
-# Shows a notification when a newer PS5 kernel is available (once per version).
+# Shows a notification when the repo's PS5 kernel differs from the running one (once per version).
+# No version ordering: kernel names end in a commit hash (sort -V ranks pb33e above p1472).
 new=$(curl -fsSL --max-time 30 https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sed -n 's/^KVER=//p' | head -1)
 cur=$(uname -r)
 [ -n "$new" ] && [ "$new" != "$cur" ] || exit 0
-[ "$(printf '%s\n%s\n' "$new" "$cur" | sort -V | tail -1)" = "$new" ] || exit 0
 seen="$HOME/.cache/ps5-update-notified"
 [ "$(cat "$seen" 2>/dev/null)" = "$new" ] && exit 0
 mkdir -p "$HOME/.cache"
