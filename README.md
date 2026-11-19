@@ -176,6 +176,7 @@ The PS5 boots into **Gaming Mode**: Steam's console interface, as on SteamOS.
 - **To the desktop:** Steam's power menu → **Switch to Desktop**.
 - **Back to Gaming Mode:** the **Return to Gaming Mode** icon on the desktop.
 - **Display and network settings** are in Steam's settings, as on a Steam Deck.
+- **Quick menu** (performance overlay, frame limit, FreeSync/VRR): <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> on a keyboard, also in a game. See [section 5](#5-display-resolutions-refresh-rates-and-hdr).
 - **OS updates:** Steam says it's up to date because CachyOS isn't updated through Steam. Open **Update PS5 CachyOS** on the desktop (see [below](#updating-everything-recommended)), or run `sudo pacman -Syu` and `flatpak update`.
 - **Kernel and image updates:** `pacman` doesn't update the PS5 kernel or the image's extras, see [Updating everything](#updating-everything-recommended) below.
 
@@ -265,6 +266,19 @@ The modes follow your screen, within what the PS5's HDMI chip can do:
 For fast games that already run above 144 fps (CS2, for example), fixed 144 Hz usually feels better than FreeSync at 120 Hz.
 
 **Gaming Mode refresh rate:** Gaming Mode starts at your screen's native resolution and up to 144 Hz. The **Gaming Mode Refresh Rate** icon on the desktop switches it between 144 Hz, 120 Hz (for FreeSync), 60 Hz and the monitor's default.
+
+**FreeSync in Gaming Mode:**
+1. Turn on **Adaptive-Sync / FreeSync** in the monitor's own menu (see above).
+2. Pick **120 Hz** (or 60 Hz) with the **Gaming Mode Refresh Rate** icon on the desktop, then go back to Gaming Mode.
+3. Open Steam's quick menu (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> on a keyboard) → **Performance** (lightning icon) → turn on **Enable VRR**. It then says *Display state: VRR Enabled*.
+
+To check that it works, set a frame limit below 120 (see below) and open your monitor's info menu: with FreeSync it shows **AMD FreeSync** and a refresh rate that follows the game. At 144 Hz Steam still lets you turn VRR on, but the monitor stays at a fixed 144 Hz.
+
+**Frame limit and overlay:** in the same **Performance** menu:
+- **Frame Limit:** turn off **Disable Frame Limit**, then pick the fps with the slider. If it's lower than the game's own limit (for example `fps_max` in CS2), it wins. It doesn't change the screen's refresh rate; use the desktop icon for that.
+- **Performance Overlay Level:** 1–4 shows fps, CPU/GPU load and temperatures in game. Off by default.
+
+<img src="images/gaming-mode-performance-vrr.jpg" alt="Steam quick menu in Gaming Mode, Performance tab: Performance Overlay Level 1, Frame Limit 120 FPS, Enable VRR on with Display state: VRR Enabled" width="300">
 
 ![KDE Display settings on the PS5: 2560x1440 at 144 Hz, Adaptive sync (FreeSync) available, Enable HDR ticked, 12 bits per colour](images/display-vrr-pb33e.jpg)
 
