@@ -562,3 +562,5 @@ The old kernel patches (`0001` Bluetooth, `0002`/`0003` 1440p @ 120 Hz) are gone
   - [ps5-linux-tools](https://github.com/ps5-linux/ps5-linux-tools): boost and fan control
 
 This repo only collects the fixes I needed on top.
+
+If this guide helped you, you can [buy me a coffee on Ko-fi](https://ko-fi.com/abrocoma). Thanks!
