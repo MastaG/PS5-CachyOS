@@ -2,7 +2,7 @@
 # Installs the fixes from this repo (see README).
 # Always: black screen lock, DualSense reconnect, zram, boot-order fix, Chrome flags.
 # Menu: boost (+ fan on older kernels), Wi-Fi driver, DNS fix, boot to desktop (shows what's already installed).
-# Does NOT touch the kernel or /boot/efi (section 12).
+# Does NOT touch the kernel or /boot/efi (docs/advanced.md).
 # Usage: sudo ./install.sh        (sudo ./install.sh -y installs every extra not yet installed)
 set -e
 [ "$(id -u)" = 0 ] || { echo "run as root (sudo ./install.sh)"; exit 1; }
@@ -163,7 +163,7 @@ else
     install -Dm644 etc/systemd/zram-generator.conf /etc/systemd/zram-generator.conf; echo "  zram: installed"
 fi
 
-# Boot ordering cycle fix (section 11)
+# Boot ordering cycle fix (docs/advanced.md)
 f=/etc/systemd/system/ps5-stage-firmware.service
 if [ ! -f "$f" ]; then
     echo "  boot-order fix: not needed (no ps5-stage-firmware.service)"
@@ -178,7 +178,7 @@ fi
 systemctl daemon-reload
 systemctl enable -q dp-link-lock.service bluetooth.service bt-connectable.service
 
-# Chrome hardware video decode (section 6)
+# Chrome hardware video decode (README section 7)
 f=$UHOME/.config/chrome-flags.conf
 if [ -e "$f" ]; then
     echo "  Chrome video flags: already installed"
@@ -201,7 +201,7 @@ if picked fan; then
             echo "  fan + boost: installed"
         fi
     else
-        echo "  fan + boost: no internet, skipped. See section 6."
+        echo "  fan + boost: no internet, skipped. See README section 7."
     fi
 fi
 
@@ -219,7 +219,7 @@ if picked wifi; then
         nmcli radio wifi on
         echo "  Wi-Fi driver: installed. Re-run this after every kernel update."
     else
-        echo "  Wi-Fi driver: no internet, skipped. See section 11."
+        echo "  Wi-Fi driver: no internet, skipped. See docs/advanced.md."
     fi
 fi
 
