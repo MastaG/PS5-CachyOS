@@ -119,7 +119,7 @@ It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam
 <summary>Single steps and what they change</summary>
 
 - **Kernel only:** `curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh`. Replaces `/boot/efi/bzImage` + `initrd.img` (old ones kept as `.bak`) and the modules, incl. the Wi-Fi driver. FreeSync and 1080p 144 Hz also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt`. Booting from USB with root on an M.2 drive works too.
-- **Gaming Mode and Steam extras only:** `curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh`. Stops Steam from "updating" on every switch between Gaming Mode and the desktop, adds the performance overlay, makes shader pre-caching use all 16 threads, and adds the **Gaming Mode Refresh Rate** and **12-bit Colour** icons. Changed files are kept as `.bak-extras`; a launcher you edited yourself is left alone (`--force` replaces it).
+- **Gaming Mode and Steam extras only:** `curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh`. Stops Steam from "updating" on every switch between Gaming Mode and the desktop, adds the performance overlay, makes shader pre-caching use all 16 threads, lets you pick the refresh rate in Steam's own display settings, turns on HDR in Gaming Mode (PS5 Fat), and adds the **12-bit Colour** icon. Changed files are kept as `.bak-extras`; a launcher you edited yourself is left alone (`--force` replaces it).
 - **Undo** each one: the same line with `| sudo sh -s -- --rollback` at the end.
 </details>
 
@@ -136,9 +136,13 @@ It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam
 
 - **Desktop:** pick 60 or 120 Hz, then **System Settings → Display → Adaptive sync:** *Automatic*.
 
+### Refresh rate in Gaming Mode
+
+Steam **Settings → Display** lists your screen's resolutions and refresh rates (for example 1440p at 60 / 120 / 144 Hz). The change is live, and Steam remembers it per screen. Games read the refresh rate when they start, so a game that's already running shows the new value in its own settings after a restart.
+
 ### FreeSync in Gaming Mode
 
-1. Pick **120 Hz** with the **Gaming Mode Refresh Rate** icon on the desktop (it also offers 144 Hz, 60 Hz and the monitor default), then go back to Gaming Mode.
+1. In Gaming Mode: Steam **Settings → Display** → pick **120 Hz** (or 60 Hz).
 2. Quick menu (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>) → **Performance** (lightning icon) → **Enable VRR**.
 3. To check it: set a **Frame Limit** below 120 (turn off **Disable Frame Limit** first). The monitor's info menu then shows **AMD FreeSync** and a refresh rate that follows the game.
 
@@ -148,7 +152,9 @@ The same menu has the **Performance Overlay Level** (fps, CPU/GPU load, temperat
 
 ### HDR and colour
 
-**Desktop HDR:** **System Settings → Display → Enable HDR**. HDR at 4K needs 12-bit colour: click the **12-bit Colour** icon. HDR isn't available in Gaming Mode yet.
+**Desktop HDR:** **System Settings → Display → Enable HDR**. HDR at 4K needs 12-bit colour: click the **12-bit Colour** icon. 
+
+**HDR in Gaming Mode** (PS5 Fat / FLAVA3): turn on HDR in the monitor's menu if it has a setting for it, then quick menu → **Performance** → **Enable HDR**. Steam's SDR brightness slider works too. The PS5 Slim keeps sRGB output without HDR, because HDR signalling gives a black screen on its HDMI chip.
 
 **HDMI chip:** check yours with `sudo dmesg | grep "HDMI IC"`. **FLAVA3** (launch model) does HDR and 12-bit colour. **VERDE** (Slim) is limited to 8-bit colour without HDR.
 

@@ -8,9 +8,9 @@
 # It runs, in order:
 #   1. update-kernel.sh   newest PS5 kernel + modules + Wi-Fi driver (+ 12-bit colour fix)
 #   2. Fixes:            12-bit colour script only on FLAVA3 (PS5 Slim / VERDE got a colour tint)
-#   3. update-extras.sh   Gaming Mode launcher (no Steam update loop, performance overlay),
-#                         desktop Steam -steamos3 override, 16-thread shader pre-caching,
-#                         Gaming Mode refresh rate menu + "12-bit Colour" icon
+#   3. update-extras.sh   Gaming Mode launcher (refresh rate in Steam, HDR on PS5 Fat, no Steam
+#                         update loop, performance overlay), desktop Steam -steamos3 override,
+#                         16-thread shader pre-caching, "12-bit Colour" icon
 #   4. FreeSync + 1080p 144 Hz boot options (asks first)
 #   5. quiet-fan.sh       quieter fan curve + SoC Temp in the panel (asks first, default no)
 #   6. Updater:           "Update PS5 CachyOS" icon (runs this script) + a daily check that

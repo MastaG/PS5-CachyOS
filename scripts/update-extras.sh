@@ -11,8 +11,10 @@
 #   - Desktop Steam starts with -steamos3 (Steam menu entry, desktop icon, game icons, autostart),
 #     so desktop and Gaming Mode use the same Steam client build.
 #   - Faster "Processing Vulkan shaders": Steam uses all 16 CPU threads (steam_dev.cfg).
-#   - Gaming Mode refresh rate menu: "Gaming Mode Refresh Rate" desktop icon (144 / 120 for
-#     FreeSync / 60 / monitor default). Gaming Mode starts at 144 Hz until you pick something else.
+#   - Refresh rate and resolution chosen in Steam itself (Settings -> Display), live, remembered
+#     per screen; games see the real refresh rate. Replaces the old "Gaming Mode Refresh Rate" icon.
+#   - HDR in Gaming Mode (quick menu -> Performance -> Enable HDR) on the PS5 Fat (FLAVA3 HDMI chip).
+#     PS5 Slim (VERDE) keeps sRGB output without HDR.
 #   - "12-bit Colour" desktop icon (sets the colour resolution to 12 bits, needed for HDR at 4K).
 # Needs the SteamOS-style Gaming Mode of the 2026-11-10 image or newer. The Gaming Mode launcher
 # /usr/bin/gamescope-session-ps5 is replaced only if it's a known image version (or with --force);
@@ -24,7 +26,9 @@ LAUNCHER=/usr/bin/gamescope-session-ps5
 SHA_1110=40d3668d176a989f46740585cdbb0deb758d8c331e3468c26d8c6f4482cde692   # 2026-11-10 image
 SHA_1114=f2ad02a6769246150b99bb62bef6d2d2b4fde25b55b7ab8b4827606d3edb0f19   # 2026-11-14 and 2026-11-17 images
 SHA_MANGO=048a1c7d106f674ea48c826831e23f64e8a03e325568fff405b7d2c16dd8f50b  # 2026-11-18 live test (unconditional --mangoapp)
-SHA_NEW=49d2fce011746602c4669624afa078748cb7da07d83fd83a52adee4555b616b5    # no -steamdeck + mangoapp overlay (if installed)
+SHA_1119=49d2fce011746602c4669624afa078748cb7da07d83fd83a52adee4555b616b5   # 2026-11-19: no -steamdeck + mangoapp overlay
+SHA_NEW=e0f8569765df67f4490fe28d3ca99d1b41d8054762909b1c3a991e131e7ad9b4    # + refresh rate in Steam, HDR (FLAVA3), WSI
+SRGB_LUA_NAME=ps5-display.lua   # gamescope sRGB override in ~/.config/gamescope/scripts (needed on VERDE)
 MENU=/usr/local/bin/ps5-gaming-mode-refresh
 BIT12=/usr/local/bin/ps5-12bit-colour
 SYS_STEAM=/usr/share/applications/steam.desktop
@@ -50,6 +54,10 @@ APPS="$H/.local/share/applications"
 OVR="$APPS/steam.desktop"
 STEAMDIR="$H/.local/share/Steam"
 DEVCFG="$STEAMDIR/steam_dev.cfg"
+SRGB_LUA="$H/.config/gamescope/scripts/$SRGB_LUA_NAME"
+# HDMI chip: FLAVA3 (PS5 Fat) does HDR; VERDE (PS5 Slim) needs the sRGB override.
+IC=$(dmesg 2>/dev/null | sed -n 's/.*HDMI IC Type \[\([A-Za-z0-9]*\)\].*/\1/p' | head -1)
+[ -n "$IC" ] || IC=$(journalctl -k -b 2>/dev/null | sed -n 's/.*HDMI IC Type \[\([A-Za-z0-9]*\)\].*/\1/p' | head -1)
 
 udir() { su "$U" -s /bin/sh -c 'mkdir -p "$1"' _ "$1"; }   # make a folder owned by the user
 # Steam launch lines in .desktop files: "Exec=steam ..." or "Exec=/usr/bin/steam ..."
@@ -76,13 +84,22 @@ if [ "${1:-}" = "--rollback" ]; then
 	else
 		echo "Gaming Mode launcher: no $LAUNCHER.bak-extras, left as it is."
 	fi
+	if [ -f "$SRGB_LUA.bak-extras" ] && [ ! -f "$SRGB_LUA" ]; then
+		mv "$SRGB_LUA.bak-extras" "$SRGB_LUA" && echo "sRGB override for Gaming Mode restored (HDR off again)."
+	fi
+	if [ -f "$MENU.bak-extras" ] && [ ! -f "$MENU" ]; then
+		mv "$MENU.bak-extras" "$MENU"
+		[ -f "$DESK/gaming-mode-refresh.desktop.bak-extras" ] &&
+			mv "$DESK/gaming-mode-refresh.desktop.bak-extras" "$DESK/gaming-mode-refresh.desktop"
+		echo "Gaming Mode Refresh Rate icon restored."
+	fi
 	if [ -f "$OVR.bak-extras" ]; then
 		mv "$OVR.bak-extras" "$OVR" && echo "Your own Steam menu entry restored."
 	elif grep -qs '^X-PS5-CachyOS=steamos3' "$OVR"; then
 		rm -f "$OVR" && echo "Steam menu entry back to the normal one (without -steamos3)."
 	fi
 	steam_icons | while IFS= read -r f; do
-		grep -qE '^Exec=(/usr/bin/)?steam -steamos3( |$)' "$f" && del_steamos3 "$f" && echo "Removed -steamos3 from $f"
+		if grep -qE '^Exec=(/usr/bin/)?steam -steamos3( |$)' "$f"; then del_steamos3 "$f"; echo "Removed -steamos3 from $f"; fi
 	done
 	if [ -f "$DEVCFG.bak-extras" ]; then
 		mv "$DEVCFG.bak-extras" "$DEVCFG" && echo "Your own steam_dev.cfg restored."
@@ -101,16 +118,16 @@ sha=$(sha256sum "$LAUNCHER" | cut -d' ' -f1)
 replace=no
 case "$sha" in
 	"$SHA_NEW") echo "Gaming Mode launcher is already the newest one." ;;
-	"$SHA_1110"|"$SHA_1114"|"$SHA_MANGO") replace=yes ;;
+	"$SHA_1110"|"$SHA_1114"|"$SHA_MANGO"|"$SHA_1119") replace=yes ;;
 	*)
 		if [ "${1:-}" = "--force" ]; then
 			replace=yes
 		else
 			echo "Gaming Mode launcher: SKIPPED, left as it is."
-			echo "  $LAUNCHER is not one of the versions from the 2026-11-10, 2026-11-14 or"
-			echo "  2026-11-17 images (sha256: $sha),"
+			echo "  $LAUNCHER is not one of the known versions (2026-11-10 to 2026-11-19)"
+			echo "  (sha256: $sha),"
 			echo "  so it was probably edited by hand. To replace it anyway with the newest one"
-			echo "  (no -steamdeck, performance overlay; yours is kept as .bak-extras):"
+			echo "  (refresh rate in Steam, HDR, performance overlay; yours is kept as .bak-extras):"
 			echo "    curl -fsSL $URL | sudo sh -s -- --force"
 			echo "  The other extras below are installed either way."
 		fi
@@ -132,16 +149,18 @@ if [ "$replace" = yes ]; then
 #   --backend drm            : take the DRM device directly (no nested compositor)
 #   -e                       : embedded / Steam Big Picture mode
 #   --prefer-output DP-1     : target the PS5's internal DP connector
-#   --sdr-gamut-wideness 0   : keep SDR colour space at sRGB; the PS5's internal
-#                              DP->HDMI bridge cannot translate BT2020 signalling
+#   --sdr-gamut-wideness 0   : SDR content stays sRGB (no oversaturated colours)
+#   --xwayland-count 2       : Steam gets its own Xwayland, as on SteamOS (Steam's display
+#                              settings then show the mode that is really in use)
 #
-# The ps5-display.lua script in ~/.config/gamescope/scripts/ enforces sRGB
-# colorimetry at the DRM atomic commit level (belt-and-suspenders with the flag).
+# PS5 Slim (VERDE HDMI chip): ~/.config/gamescope/scripts/ps5-display.lua forces sRGB,
+# because BT2020/HDR signalling gives a black screen there. Without that script (PS5 Fat,
+# FLAVA3) Steam's HDR switch is offered.
 
 export LIBSEAT_BACKEND=logind
 export WLR_LIBINPUT_NO_DEVICES=1
 
-# Steam UI options, same as Bazzite's session (HDR deliberately left out: see ps5-display.lua).
+# Steam UI options, as in SteamOS's gamescope session.
 # Performance overlay (Steam menu -> Performance): mangoapp, toggled from inside Gaming Mode.
 export STEAM_USE_MANGOAPP=1
 export STEAM_MANGOAPP_PRESETS_SUPPORTED=1
@@ -155,25 +174,26 @@ export STEAM_GAMESCOPE_NIS_SUPPORTED=1
 export STEAM_GAMESCOPE_FANCY_SCALING_SUPPORT=1
 export STEAM_GAMESCOPE_COLOR_MANAGED=1
 export STEAM_GAMESCOPE_VIRTUAL_WHITE=1
+export STEAM_GAMESCOPE_DYNAMIC_FPSLIMITER=1
+export STEAM_MULTIPLE_XWAYLANDS=1
+# Refresh rate / resolution picker in Steam (Settings -> Display): gamescope lists the
+# screen's modes and remembers the chosen one per screen.
+mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/gamescope"
+export GAMESCOPE_MODE_SAVE_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/gamescope/modes.cfg"
+export GAMESCOPE_PATCHED_EDID_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/gamescope/edid.bin"
+# Games see the real refresh rate (gamescope's Vulkan WSI layer).
+export ENABLE_GAMESCOPE_WSI=1
+# HDR switch in Steam, unless the sRGB override is in place (PS5 Slim).
+[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/gamescope/scripts/ps5-display.lua" ] ||
+    export STEAM_GAMESCOPE_HDR_SUPPORTED=1
 
 # Launch flags:
 #   -gamepadui  : controller-friendly Steam UI (Big Picture-like)
 #   -steamos3 -steampal : SteamOS-style UI (Switch to Desktop, display
-#                   settings), as on Bazzite. OS update checks are answered by the
+#                   settings). OS update checks are answered by the
 #                   /usr/bin/steamos-update stub ("no update"); use pacman for updates.
 #   (-steamdeck removed 2026-11-18: it switched Steam to the Deck client build and
 #    desktop Steam switched it back, so Steam "updated" on every mode switch.)
-# Gaming Mode refresh rate, chosen with the "Gaming Mode Refresh Rate" desktop icon
-# (saved in ~/.config/ps5-gaming-mode.conf). Only the refresh rate is passed, so gamescope
-# keeps the screen's native resolution and picks the closest supported rate.
-# Empty = the monitor's default mode (usually 60 Hz).
-PS5_GM_REFRESH=144
-PS5_GM_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/ps5-gaming-mode.conf"
-if [ -r "$PS5_GM_CONF" ]; then
-    PS5_GM_REFRESH=$(sed -n 's/^PS5_GM_REFRESH=\([0-9]*\)$/\1/p' "$PS5_GM_CONF" | tail -1)
-fi
-REFRESH_ARGS=
-[ -n "$PS5_GM_REFRESH" ] && REFRESH_ARGS="-r $PS5_GM_REFRESH"
 MANGO_ARGS=
 command -v mangoapp >/dev/null 2>&1 && MANGO_ARGS="--mangoapp"
 
@@ -181,8 +201,8 @@ command -v mangoapp >/dev/null 2>&1 && MANGO_ARGS="--mangoapp"
     --backend drm \
     -e \
     --prefer-output DP-1 \
-    $REFRESH_ARGS \
     --sdr-gamut-wideness 0 \
+    --xwayland-count 2 \
     $MANGO_ARGS \
     -- \
     /usr/bin/steam -gamepadui -steamos3 -steampal
@@ -203,7 +223,17 @@ PS5EOF
 		{ rm -f "$LAUNCHER.new"; die "the new launcher came out wrong (download cut off?). Nothing changed."; }
 	chmod 755 "$LAUNCHER.new"
 	mv "$LAUNCHER.new" "$LAUNCHER"
-	echo "Gaming Mode: no more Steam update on every switch; performance overlay in the Steam menu."
+	echo "Gaming Mode: refresh rate in Steam's display settings, performance overlay, no Steam update loop."
+fi
+
+# HDR in Gaming Mode: only without the sRGB override, and only on FLAVA3 (PS5 Fat).
+if [ "$IC" = FLAVA3 ] && [ -f "$SRGB_LUA" ]; then
+	mv "$SRGB_LUA" "$SRGB_LUA.bak-extras"
+	echo "Gaming Mode HDR: enabled for the FLAVA3 HDMI chip (sRGB override kept as $SRGB_LUA_NAME.bak-extras)."
+elif [ "$IC" = FLAVA3 ]; then
+	echo "Gaming Mode HDR: already enabled."
+else
+	echo "Gaming Mode HDR: not enabled (HDMI chip: ${IC:-unknown}; HDR needs FLAVA3, PS5 Slim stays on sRGB)."
 fi
 
 # Desktop Steam with -steamos3: same Steam client build as Gaming Mode, so switching modes no
@@ -227,7 +257,7 @@ if [ -f "$SYS_STEAM" ]; then
 	fi
 fi
 steam_icons | while IFS= read -r f; do
-	needs_steamos3 "$f" && add_steamos3 "$f" && echo "Added -steamos3 to $f"
+	if needs_steamos3 "$f"; then add_steamos3 "$f"; echo "Added -steamos3 to $f"; fi
 done
 
 # Faster "Processing Vulkan shaders": shader pre-caching on all 16 threads (Arch Wiki).
@@ -245,33 +275,16 @@ else
 	echo "Steam shader pre-caching now uses all 16 CPU threads."
 fi
 
-echo "Installing the refresh rate menu and the 12-bit colour script..."
-	cat > "$MENU" <<'PS5EOF'
-#!/bin/sh
-# Choose the refresh rate Gaming Mode starts with. Read by /usr/bin/gamescope-session-ps5.
-CONF="${XDG_CONFIG_HOME:-$HOME/.config}/ps5-gaming-mode.conf"
-cur=144
-[ -r "$CONF" ] && cur=$(sed -n 's/^PS5_GM_REFRESH=\([0-9]*\)$/\1/p' "$CONF" | tail -1)
-echo "Gaming Mode refresh rate (now: ${cur:-monitor default})"
-echo
-echo "  1) Highest, 144 Hz (60 Hz screens get 60, 120 Hz TVs get 120)"
-echo "  2) 120 Hz (use this for FreeSync / VRR)"
-echo "  3) 60 Hz"
-echo "  4) Monitor default"
-echo
-printf 'Choice [1-4]: '
-read c
-case "$c" in
-    1) v=144 ;; 2) v=120 ;; 3) v=60 ;; 4) v= ;;
-    *) echo "No change."; printf 'Press Enter to close'; read _; exit 0 ;;
-esac
-mkdir -p "$(dirname "$CONF")"
-echo "PS5_GM_REFRESH=$v" > "$CONF"
-echo "Saved: ${v:+$v Hz}${v:-monitor default}. Used the next time Gaming Mode starts."
-printf 'Switch to Gaming Mode now? [y/N] '
-read a
-case "$a" in y|Y) steamos-session-select gamescope ;; esac
-PS5EOF
+# The old "Gaming Mode Refresh Rate" icon only set gamescope's -r, which Steam's own refresh rate
+# setting now replaces (and -r blocked it). Keep the old files for --rollback.
+if [ -f "$MENU" ]; then
+	mv "$MENU" "$MENU.bak-extras"
+	[ -f "$DESK/gaming-mode-refresh.desktop" ] &&
+		mv "$DESK/gaming-mode-refresh.desktop" "$DESK/gaming-mode-refresh.desktop.bak-extras"
+	echo "Gaming Mode Refresh Rate icon removed: choose the refresh rate in Steam -> Settings -> Display."
+fi
+
+echo "Installing the 12-bit colour script..."
 	cat > "$BIT12" <<'PS5EOF'
 #!/bin/sh
 # Set KDE's colour resolution for the PS5 HDMI output (DP-1) to 12 bits (needed for HDR at 4K).
@@ -281,21 +294,10 @@ else
     notify-send -i dialog-error "12-bit colour" "Could not set 12-bit colour on DP-1. 12-bit colour is not supported on PS5 Slim (VERDE HDMI chip)."
 fi
 PS5EOF
-chmod 755 "$MENU" "$BIT12"
+chmod 755 "$BIT12"
 
 echo "Adding the desktop icons to $DESK..."
 udir "$DESK"
-	cat > "$DESK/gaming-mode-refresh.desktop" <<'PS5EOF'
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Gaming Mode Refresh Rate
-Comment=Choose the refresh rate Gaming Mode starts with (144, 120 for FreeSync, 60, or monitor default)
-Exec=konsole -e /usr/local/bin/ps5-gaming-mode-refresh
-Icon=preferences-desktop-display
-Terminal=false
-Categories=Settings;
-PS5EOF
 	cat > "$DESK/12bit-colour.desktop" <<'PS5EOF'
 [Desktop Entry]
 Version=1.0
@@ -307,8 +309,8 @@ Icon=preferences-desktop-display
 Terminal=false
 Categories=Settings;
 PS5EOF
-chown "$U:" "$DESK/gaming-mode-refresh.desktop" "$DESK/12bit-colour.desktop"
-chmod 755 "$DESK/gaming-mode-refresh.desktop" "$DESK/12bit-colour.desktop"
+chown "$U:" "$DESK/12bit-colour.desktop"
+chmod 755 "$DESK/12bit-colour.desktop"
 sync
 
 echo
@@ -317,7 +319,9 @@ echo "  - Gaming Mode without the Steam update loop, and a performance overlay (
 echo "    Performance) if the launcher was updated above."
 echo "  - Desktop Steam on the same client build as Gaming Mode (restart Steam if it's open)."
 echo "  - Faster shader pre-caching (all 16 threads)."
-echo "  - Gaming Mode Refresh Rate and 12-bit Colour icons on the desktop."
+echo "  - Refresh rate in Steam -> Settings -> Display (also live, in Gaming Mode)."
+echo "  - HDR in Gaming Mode (quick menu -> Performance) on the PS5 Fat."
+echo "  - 12-bit Colour icon on the desktop."
 echo "If KDE asks whether to trust an icon the first time you click it, choose 'Continue'."
 echo "Undo with:"
 echo "  curl -fsSL $URL | sudo sh -s -- --rollback"

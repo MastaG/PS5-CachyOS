@@ -28,7 +28,7 @@ sha256sum ps5-cachyos.img.xz     # must match the checksum on the release page
 **Not covered by `install.sh`:**
 - **Switch to Desktop** in Gaming Mode may crash or leave a black screen on the official image. Use **boot to desktop** (`install.sh` extra, or `echo plasma > ~/.config/ps5-next-session` and reboot). Desktop → Gaming Mode is fine.
 - **USB boot settings:** add `rootdelay=60 usbcore.autosuspend=-1` to `cmdline.txt`, plus `usbc_dp.enable=0` if your kernel has ps5-linux-patches `9bad84f` or newer ([details](../README.md#drive-not-found-at-boot)).
-- **SteamOS-style Gaming Mode and desktop HDR** are only in this guide's image.
+- **SteamOS-style Gaming Mode (with HDR and Steam's refresh rate setting) and desktop HDR** are only in this guide's image.
 
 Check the boot-order fix: `journalctl -b | grep -i "ordering cycle"` should return nothing.
 
@@ -98,7 +98,7 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `scripts/fix-black-screen.sh` | TTY switch + link re-lock + double hotplug | [8](../README.md#black-screen) |
 | `scripts/update.sh` | Updates an existing install in one go (kernel, fixes, Gaming Mode/Steam extras, FreeSync, optional fan curve, updater icon + daily check, system packages + Flatpaks), `--rollback` to undo steps 1–6 | [5](../README.md#5-updating) |
 | `scripts/update-kernel.sh` | Installs the newest PS5 kernel without reflashing, `--rollback` to undo | [5](../README.md#5-updating) |
-| `scripts/update-extras.sh` | Adds the Gaming Mode and Steam extras (no Steam update loop, desktop `-steamos3`, performance overlay, 16-thread shader pre-caching, refresh rate + 12-bit colour icons), `--rollback` to undo | [5](../README.md#5-updating) |
+| `scripts/update-extras.sh` | Adds the Gaming Mode and Steam extras (no Steam update loop, desktop `-steamos3`, performance overlay, 16-thread shader pre-caching, refresh rate in Steam, HDR in Gaming Mode on FLAVA3, 12-bit colour icon), `--rollback` to undo | [5](../README.md#5-updating) |
 | `kernel/ps5-kernel-*.tar.zst` | Newest PS5 kernel + modules for `update-kernel.sh`, with `.sha256` | [5](../README.md#5-updating) |
 | `scripts/quiet-fan.sh` | Quieter fan curve + SoC temperature in the panel, `--remove` to undo | [7](../README.md#7-extras-boost-fan-and-video) |
 | `files/usr/local/bin/dp-link-lock` | Locks the display link to 4 lanes HBR3 | [8](../README.md#black-screen) |
