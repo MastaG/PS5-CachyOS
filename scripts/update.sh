@@ -102,6 +102,12 @@ remove_updater() {
 	echo "Removed the updater icon and the daily check."
 }
 
+# Run the kernel script as root. sudo drops environment variables, so pass PS5_BOOT on
+# when it's set (e.g. PS5_BOOT=/boot/efi sh update.sh to skip the same-drive check).
+kernel_sh() {
+	if [ -n "${PS5_BOOT:-}" ]; then sudo env PS5_BOOT="$PS5_BOOT" sh "$@"; else sudo sh "$@"; fi
+}
+
 [ "$(id -u)" != 0 ] || die "run it as your normal user, without sudo (it asks for the password itself)."
 grep -q 'console=ttyTitania0' /proc/cmdline || die "this doesn't look like Linux on a PS5. Nothing changed."
 command -v curl >/dev/null || die "'curl' is missing. Install it with: sudo pacman -S curl"
@@ -110,7 +116,7 @@ if [ "${1:-}" = "--rollback" ]; then
 	echo "Undoing the update (password needed)..."
 	sudo -v || exit 1
 	say "Kernel"
-	fetch update-kernel.sh | sudo sh -s -- --rollback
+	fetch update-kernel.sh | kernel_sh -s -- --rollback
 	say "Gaming Mode extras"
 	fetch update-extras.sh | sudo sh -s -- --rollback
 	[ -f /usr/local/bin/ps5-color-depth.bak-update ] && sudo mv /usr/local/bin/ps5-color-depth.bak-update /usr/local/bin/ps5-color-depth && echo "Colour script restored."
@@ -132,7 +138,7 @@ echo "Your files, apps and settings are not touched. Password needed:"
 sudo -v || exit 1
 
 say "1/6 Kernel"
-if ! fetch update-kernel.sh | sudo sh; then
+if ! fetch update-kernel.sh | kernel_sh; then
 	die "the kernel update failed (see above). Nothing else was changed."
 fi
 

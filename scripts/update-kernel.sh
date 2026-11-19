@@ -23,10 +23,25 @@ grep -q 'console=ttyTitania0' /proc/cmdline || die "this doesn't look like Linux
 [ -f "$BOOT/bzImage" ] && [ -f "$BOOT/initrd.img" ] || die "no $BOOT/bzImage + initrd.img found (boot partition not mounted?). Nothing changed."
 # With two PS5 Linux drives plugged in, /boot/efi can be the OTHER drive's boot partition
 # (both are labelled "boot"). Never write the kernel to another drive.
+# OK when the boot partition is on the same drive as /, or when root= in its cmdline.txt
+# names exactly one partition and that is this system's / (USB boot + M.2 root install).
+boot_root_ok() {
+	r=$(tr ' ' '\n' < "$BOOT/cmdline.txt" 2>/dev/null | sed -n 's/^root=//p' | tail -1)
+	case "$r" in
+		LABEL=*|UUID=*|PARTUUID=*|PARTLABEL=*) devs=$(blkid -c /dev/null -o device -t "$r" 2>/dev/null || true) ;;
+		/dev/*) devs=$r ;;
+		*) return 1 ;;
+	esac
+	[ "$(printf '%s\n' "$devs" | grep -c .)" = 1 ] || return 1
+	[ "$(readlink -f "$devs")" = "$(readlink -f "$rsrc")" ]
+}
 if [ -z "${PS5_BOOT:-}" ]; then
-	rdisk=$(lsblk -no PKNAME "$(findmnt -no SOURCE /)" 2>/dev/null || true)
+	rsrc=$(findmnt -no SOURCE / | sed 's/\[.*//')
+	rdisk=$(lsblk -no PKNAME "$rsrc" 2>/dev/null || true)
 	bdisk=$(lsblk -no PKNAME "$(findmnt -no SOURCE "$BOOT")" 2>/dev/null || true)
-	[ -n "$rdisk" ] && [ "$rdisk" = "$bdisk" ] || die "$BOOT is on another drive ($bdisk) than this system (${rdisk:-?}). Unplug the other PS5 Linux drive and restart, then run this again. Nothing changed."
+	if ! { [ -n "$rdisk" ] && [ "$rdisk" = "$bdisk" ]; } && ! boot_root_ok; then
+		die "$BOOT is on another drive ($bdisk) than this system (${rdisk:-?}), and its cmdline.txt doesn't point to this system. Unplug the other PS5 Linux drive and restart, then run this again. If $BOOT really is this system's boot partition, run with PS5_BOOT=$BOOT. Nothing changed."
+	fi
 fi
 
 if [ "${1:-}" = "--rollback" ]; then
