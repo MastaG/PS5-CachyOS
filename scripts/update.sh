@@ -8,13 +8,15 @@
 # It runs, in order:
 #   1. update-kernel.sh   newest PS5 kernel + modules + Wi-Fi driver (+ 12-bit colour fix)
 #   2. Fixes:            12-bit colour script only on FLAVA3 (PS5 Slim / VERDE got a colour tint)
-#   3. update-extras.sh   Gaming Mode refresh rate menu + "12-bit Colour" icon
-#                         (only on installs from the 2026-11-10 image or newer; skipped otherwise)
+#   3. update-extras.sh   Gaming Mode launcher (no Steam update loop, performance overlay),
+#                         desktop Steam -steamos3 override, 16-thread shader pre-caching,
+#                         Gaming Mode refresh rate menu + "12-bit Colour" icon
 #   4. FreeSync + 1080p 144 Hz boot options (asks first)
 #   5. quiet-fan.sh       quieter fan curve + SoC Temp in the panel (asks first, default no)
 #   6. Updater:           "Update PS5 CachyOS" icon (runs this script) + a daily check that
 #                         shows a notification when a newer kernel is out
-# Each step keeps backups, so --rollback undoes all of it.
+#   7. System packages:   pacman -Syu + flatpak update + lists new .pacnew files (asks first)
+# Steps 1-6 keep backups, so --rollback undoes them (package updates in step 7 can't be undone).
 set -u
 
 R=https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts
@@ -63,7 +65,7 @@ PS5EOF
 [Desktop Entry]
 Type=Application
 Name=Update PS5 CachyOS
-Comment=Install the newest PS5 kernel, fixes and extras
+Comment=Install the newest PS5 kernel, fixes, extras and system updates
 Exec=konsole -e $UBIN/ps5-update
 Icon=system-software-update
 Terminal=false
@@ -129,20 +131,21 @@ if [ "${1:-}" = "--rollback" ]; then
 	fi
 	say "Updater"
 	remove_updater
+	echo "Note: system packages and Flatpak apps updated in step 7/7 cannot be undone."
 	echo; echo "Done. Restart to boot the previous kernel."
 	exit 0
 fi
 
-echo "PS5 CachyOS updater: kernel, fixes and extras from the newest release."
+echo "PS5 CachyOS updater: kernel, fixes, extras and system packages."
 echo "Your files, apps and settings are not touched. Password needed:"
 sudo -v || exit 1
 
-say "1/6 Kernel"
+say "1/7 Kernel"
 if ! fetch update-kernel.sh | kernel_sh; then
 	die "the kernel update failed (see above). Nothing else was changed."
 fi
 
-say "2/6 Fixes"
+say "2/7 Fixes"
 CD=/usr/local/bin/ps5-color-depth
 if [ -f "$CD" ]; then
 	if fetch files/ps5-color-depth > /tmp/ps5-color-depth.new && ! cmp -s /tmp/ps5-color-depth.new "$CD"; then
@@ -156,12 +159,12 @@ else
 	echo "Nothing to fix."
 fi
 
-say "3/6 Gaming Mode extras"
+say "3/7 Gaming Mode extras"
 if ! fetch update-extras.sh | sudo sh; then
 	echo "Skipped: this install doesn't have the Gaming Mode these extras need (it's fine)."
 fi
 
-say "4/6 FreeSync and 1080p 144 Hz"
+say "4/7 FreeSync and 1080p 144 Hz"
 if grep -q 'hdmi.vrr=1' "$CMD" 2>/dev/null; then
 	echo "Already on."
 elif [ ! -f "$CMD" ]; then
@@ -174,7 +177,7 @@ else
 	echo "Left off. You can run this updater again later."
 fi
 
-say "5/6 Quiet fan curve (optional)"
+say "5/7 Quiet fan curve (optional)"
 if [ -x /usr/local/sbin/ps5-fan-curve ]; then
 	echo "Already installed."
 elif ask "Install the quieter fan curve? The console runs warmer in games; watch temps on stock paste." n; then
@@ -183,10 +186,30 @@ else
 	echo "Skipped (kernel default curve stays)."
 fi
 
-say "6/6 Updater"
+say "6/7 Updater"
 install_updater
 
+say "7/7 System packages and apps"
+if ask "Update CachyOS system packages (pacman -Syu) and Flatpak apps now?" y; then
+	echo "=== pacman (system packages) ==="
+	sudo pacman -Syu --needed mangohud lib32-mangohud </dev/tty
+	if command -v flatpak >/dev/null 2>&1; then
+		echo
+		echo "=== Flatpak ==="
+		flatpak update </dev/tty
+	fi
+	pacnew=$(find /etc -name '*.pacnew' -newermt '-1 hour' 2>/dev/null || true)
+	if [ -n "$pacnew" ]; then
+		echo
+		echo "New .pacnew config files (review later):"
+		echo "$pacnew"
+	fi
+else
+	echo "Skipped."
+fi
+
 echo
-echo "All done. Restart the PS5 Linux to use the new kernel (if it changed)."
+echo "All done. Restart PS5 Linux to use the new kernel (if it changed),"
+echo "or log out/in if Plasma, KWin or glibc were updated."
 echo "Next time, just open \"Update PS5 CachyOS\" on the desktop."
-echo "To undo:  curl -fsSL $R/update.sh | sh -s -- --rollback"
+echo "To undo steps 1-6:  curl -fsSL $R/update.sh | sh -s -- --rollback"

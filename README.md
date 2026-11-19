@@ -176,7 +176,7 @@ The PS5 boots into **Gaming Mode**: Steam's console interface, as on SteamOS.
 - **To the desktop:** Steam's power menu → **Switch to Desktop**.
 - **Back to Gaming Mode:** the **Return to Gaming Mode** icon on the desktop.
 - **Display and network settings** are in Steam's settings, as on a Steam Deck.
-- **OS updates:** Steam says it's up to date because CachyOS isn't updated through Steam. Use `sudo pacman -Syu` on the desktop.
+- **OS updates:** Steam says it's up to date because CachyOS isn't updated through Steam. Open **Update PS5 CachyOS** on the desktop (see [below](#updating-everything-recommended)), or run `sudo pacman -Syu` and `flatpak update`.
 - **Kernel and image updates:** `pacman` doesn't update the PS5 kernel or the image's extras, see [Updating everything](#updating-everything-recommended) below.
 
 ![Steam's power menu with Switch to Desktop](images/switch-to-desktop.jpg)
@@ -194,18 +194,19 @@ One command brings an older install up to the newest release, no reflash. Run it
 curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update.sh | sh
 ```
 
-![The updater on the desktop: all six steps done, with the "Update PS5 CachyOS" icon among the desktop icons](images/updater-p1472.jpg)
+![The updater on the desktop: the "Update PS5 CachyOS" icon among the desktop icons](images/updater-p1472.jpg)
 
-It runs these steps in order, then you restart:
+It runs these seven steps in order:
 
 1. **Kernel:** the newest PS5 kernel (see [Updating the kernel](#updating-the-kernel)).
-1. **Fixes:** for example the colour tint on the PS5 Slim (VERDE): the 12-bit colour script now only runs on the PS5 Fat (FLAVA3).
-2. **Gaming Mode extras:** the refresh rate menu and the 12-bit Colour icon (see [below](#getting-the-2026-11-14-extras)). Skipped on installs that don't have this image's Gaming Mode.
-3. **FreeSync and 1080p 144 Hz:** asks first, then adds the two boot options to `cmdline.txt` (the old file is kept as `cmdline.txt.bak-update`).
-4. **Quiet fan curve:** asks first, default no (see [section 6](#6-extras-boost-fan-video-and-dns)).
-5. **Updater:** adds an **Update PS5 CachyOS** icon to the desktop and app menu, and a daily check that shows a notification when a newer kernel is out. After the first run, updating is just a click on that icon.
+2. **Fixes:** for example the colour tint on the PS5 Slim (VERDE): the 12-bit colour script now only runs on the PS5 Fat (FLAVA3).
+3. **Gaming Mode extras:** stops Steam from "updating" on every switch between Gaming Mode and the desktop (drops `-steamdeck` in Gaming Mode and adds `-steamos3` to desktop Steam), enables the Gaming Mode performance overlay (**Steam menu → Performance**, when `mangohud` is installed), sets Steam shader pre-caching to use all 16 CPU threads, and adds the **Gaming Mode Refresh Rate** and **12-bit Colour** desktop icons (see [below](#getting-the-gaming-mode-and-steam-extras)). Skipped on installs that don't have this image's Gaming Mode.
+4. **FreeSync and 1080p 144 Hz:** asks first, then adds the two boot options to `cmdline.txt` (the old file is kept as `cmdline.txt.bak-update`).
+5. **Quiet fan curve:** asks first, default no (see [section 6](#6-extras-boost-fan-video-and-dns)).
+6. **Updater:** adds an **Update PS5 CachyOS** icon to the desktop and app menu, and a daily check that shows a notification when a newer kernel is out. After the first run, updating is just a click on that icon.
+7. **System packages and apps:** asks first, then updates all CachyOS packages (`sudo pacman -Syu --needed mangohud lib32-mangohud`) and Flatpak apps/runtimes (`flatpak update`), and lists any new `.pacnew` config files.
 
-**Undo:** the same line with `| sh -s -- --rollback` at the end.
+**Undo:** the same line with `| sh -s -- --rollback` at the end undoes steps 1–6 (package updates in step 7 cannot be undone).
 
 The single-step commands below still work if you only want one part.
 
@@ -224,17 +225,20 @@ Then restart and boot Linux as usual; `uname -r` shows the new version.
 - **FreeSync and 1080p 144 Hz** also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt` (the 2026-11-14 image and newer have them; the script reminds you if they're missing).
 - **The files** are in [`kernel/`](kernel): kernel + modules taken unchanged from the image, plus a checksum the script verifies.
 
-### Getting the 2026-11-14 extras
+### Getting the Gaming Mode and Steam extras
 
-On the 2026-11-10 image, this adds the two new desktop icons without reflashing:
+On the 2026-11-10 image or newer, this adds the newest Gaming Mode and Steam extras without reflashing:
 
 ```
 curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh
 ```
 
+- **No more Steam "update" on every mode switch:** drops `-steamdeck` from Gaming Mode and starts desktop Steam with `-steamos3` (app menu entry, desktop icon, game shortcuts), so both modes stay on the same Steam client build.
+- **Gaming Mode performance overlay:** **Steam menu → Performance** (uses `mangoapp` when `mangohud` and `lib32-mangohud` are installed).
+- **Faster "Processing Vulkan shaders":** sets `unShaderBackgroundProcessingThreads 16` in `~/.local/share/Steam/steam_dev.cfg` (if not already set) so Steam uses all 16 CPU threads instead of one core.
 - **Gaming Mode Refresh Rate:** choose 144, 120 (for FreeSync), 60 Hz or the monitor default. Gaming Mode starts at 144 Hz until you pick something else.
-- **12-bit Colour:** sets the colour resolution to 12 bits, needed for HDR at 4K.
-- **What it changes:** the Gaming Mode launcher `/usr/bin/gamescope-session-ps5` (the old one is kept as `.bak-extras`), plus two small scripts in `/usr/local/bin` and the icons on your desktop. If you edited the launcher yourself, it stops and changes nothing.
+- **12-bit Colour:** sets the colour resolution to 12 bits, needed for HDR at 4K (PS5 Fat / FLAVA3 only; not supported on PS5 Slim / VERDE).
+- **What it changes:** the Gaming Mode launcher `/usr/bin/gamescope-session-ps5`, a desktop Steam override in `~/.local/share/applications/steam.desktop` (plus `-steamos3` on Steam desktop shortcuts), `steam_dev.cfg`, and the two scripts in `/usr/local/bin` + desktop icons. Existing files are backed up as `.bak-extras`. If you edited the launcher yourself, it leaves the launcher alone and still installs the rest (re-run with `--force` to replace the launcher anyway).
 - **Undo:** the same line with `| sudo sh -s -- --rollback` at the end.
 
 <sub>[↑ Back to contents](#contents)</sub>
@@ -517,9 +521,9 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `install.sh` | Checks the core fixes, offers the extras | 6, 11 |
 | `scripts/boot-to-desktop.sh` | Pick `plasma` or `gamescope` for the next boot | 4 |
 | `scripts/fix-black-screen.sh` | TTY switch + link re-lock + double hotplug | 7 |
-| `scripts/update.sh` | Updates an existing install to the newest release in one go (kernel, extras, FreeSync, optional fan curve) and adds an update icon + daily update check, `--rollback` to undo | 4 |
+| `scripts/update.sh` | Updates an existing install in one go (kernel, fixes, Gaming Mode/Steam extras, FreeSync, optional fan curve, updater icon + daily check, system packages + Flatpaks), `--rollback` to undo steps 1–6 | 4 |
 | `scripts/update-kernel.sh` | Installs the newest PS5 kernel without reflashing, `--rollback` to undo | 4 |
-| `scripts/update-extras.sh` | Adds the 2026-11-14 desktop icons (Gaming Mode refresh rate, 12-bit colour) to older installs, `--rollback` to undo | 4 |
+| `scripts/update-extras.sh` | Adds the Gaming Mode and Steam extras (no Steam update loop, desktop `-steamos3`, performance overlay, 16-thread shader pre-caching, refresh rate + 12-bit colour icons), `--rollback` to undo | 4 |
 | `kernel/ps5-kernel-*.tar.zst` | Newest PS5 kernel + modules for `update-kernel.sh`, with `.sha256` | 4 |
 | `scripts/quiet-fan.sh` | Quieter fan curve + SoC temperature in the panel, `--remove` to undo | 6 |
 | `files/usr/local/bin/dp-link-lock` | Locks the display link to 4 lanes HBR3 | 7, 11 |
