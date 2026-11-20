@@ -34,7 +34,7 @@ Check the boot-order fix: `journalctl -b | grep -i "ordering cycle"` should retu
 
 ## Building your own kernel
 
-Not needed for the image. This is an example build of Linux 7.2.3 + ps5-linux-patches `5f6b5d3` (the exact source of each image's kernel is in `KERNEL-SOURCE.md` on its release page). It needs about **15 GB free** and takes **30-60 minutes** on the PS5. Add `usbc_dp.enable=0` to `cmdline.txt` first ([section 8](../README.md#drive-not-found-at-boot)), or a USB-C SSD drops off.
+Not needed for the image. This is an example build of Linux 7.3.5 + ps5-linux-patches `c8fe83a`, the source of the 7.3.5-pc8fe kernel (the exact source of each image's kernel is in `KERNEL-SOURCE.md` on its release page). It needs about **15 GB free** and takes **30-60 minutes** on the PS5. Add `usbc_dp.enable=0` to `cmdline.txt` first ([section 8](../README.md#drive-not-found-at-boot)), or a USB-C SSD drops off.
 
 **1. Build tools**
 ```sh
@@ -44,26 +44,26 @@ sudo pacman -S --needed base-devel bc pahole cpio git
 **2. Get the sources** (keep this layout: the kernel config finds the video firmware in `../ps5-linux-patches/firmware`)
 ```sh
 mkdir -p ~/kernel && cd ~/kernel
-curl -LO https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.3.tar.xz
-tar xf linux-7.2.3.tar.xz
+curl -LO https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.5.tar.xz
+tar xf linux-7.3.5.tar.xz
 git clone https://github.com/ps5-linux/ps5-linux-patches
-git -C ps5-linux-patches checkout 5f6b5d3
+git -C ps5-linux-patches checkout c8fe83a
 ```
 
 **3. Patch, configure and build**
 ```sh
-cd ~/kernel/linux-7.2.3
+cd ~/kernel/linux-7.3.5
 patch -p1 < ../ps5-linux-patches/linux.patch
-for p in ~/PS5-CachyOS/patches/000[56]-*.patch; do patch -p1 < "$p"; done   # PS5 Pro Bluetooth (path to this repo)
+for p in ~/PS5-CachyOS/patches/000[567]-*.patch; do patch -p1 < "$p"; done   # PS5 Pro Bluetooth + 75 Hz (path to this repo)
 cp ../ps5-linux-patches/.config .config
-scripts/config --set-str LOCALVERSION "-ps5"    # names it 7.2.3-ps5, so it doesn't clash with the image's kernel
+scripts/config --set-str LOCALVERSION "-ps5"    # names it 7.3.5-ps5, so it doesn't clash with the image's kernel
 make olddefconfig
 make -j"$(nproc)" bzImage modules               # the long part
 ```
 
 **4. Install the modules and initramfs**
 ```sh
-KVER=$(make -s kernelrelease)                   # 7.2.3-ps5
+KVER=$(make -s kernelrelease)                   # 7.3.5-ps5
 sudo make modules_install INSTALL_MOD_STRIP=1   # stripped, or the initramfs grows to ~300 MB
 sudo mkinitcpio -k "$KVER" -g "/boot/efi/initrd-$KVER.img"
 sudo cp arch/x86/boot/bzImage "/boot/efi/bzImage-$KVER"
@@ -76,7 +76,7 @@ nmcli radio wifi off; sudo modprobe -r moal mlan; sudo modprobe -r btusb   # the
 sudo kexec -l "/boot/efi/bzImage-$KVER" --initrd="/boot/efi/initrd-$KVER.img" --command-line="$(cat /boot/efi/cmdline.txt)"
 sudo systemctl kexec
 ```
-Once it's up, check `uname -r` says `7.2.3-ps5`, then reinstall the Wi-Fi driver for it: `sudo ./install.sh` → **Wi-Fi driver**.
+Once it's up, check `uname -r` says `7.3.5-ps5`, then reinstall the Wi-Fi driver for it: `sudo ./install.sh` → **Wi-Fi driver**.
 
 **6. Make it the default** (only once the test worked)
 ```sh
@@ -113,6 +113,7 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `patches/0004-mwifiex-txpower-bounded-wait.patch` | Wi-Fi driver patch that stops a stuck firmware from freezing all networking | [8](../README.md#wi-fi-and-bluetooth) |
 | `patches/0005-btusb-ps5-pro-viola-0e8d-3605.patch` | Kernel patch: PS5 Pro internal Bluetooth (HCI on interface 3, ACL on bulk OUT `0x0d`), from [QuartConz/ps5-pro-viola-bluetooth](https://github.com/QuartConz/ps5-pro-viola-bluetooth). Apply after `linux.patch` | [8](../README.md#wi-fi-and-bluetooth) |
 | `patches/0006-bluetooth-l2cap-defer-security-block-while-encryption-pending.patch` | Kernel patch: the DualSense no longer disconnects right after connecting on the PS5 Pro (same source). Apply after `linux.patch` | [8](../README.md#wi-fi-and-bluetooth) |
+| `patches/0007-hdmi-75hz-range-clock-polarity.patch` | Kernel patch: 75 Hz and other modes on monitors whose EDID has no max TMDS clock (uses the range-limits clock, sends manual timings as +H -V). Apply after `linux.patch` | [6](../README.md#6-display-freesync-and-hdr) |
 | `files/etc/udev/rules.d/50-viola-bt-power.rules`, `files/etc/modprobe.d/viola-btusb.conf` | PS5 Pro Bluetooth: no USB autosuspend (it kills the internal USB controller) | [8](../README.md#wi-fi-and-bluetooth) |
 | `files/usr/local/sbin/ps5-viola-bt-reset`, `files/etc/systemd/system/ps5-viola-bt-reset.service` | PS5 Pro Bluetooth: reloads btusb once at boot (after the first setup, before the pairing import and bluetoothd). The chip keeps power through the rest-mode handoff, and a DualSense used in PS5 OS otherwise stays caught by PS5 OS's Bluetooth function | [8](../README.md#wi-fi-and-bluetooth) |
 | `files/usr/local/sbin/ps5-viola-bt-revive`, `files/etc/systemd/system/ps5-viola-bt-revive.service` | PS5 Pro Bluetooth: saves the PS5 OS Bluetooth address the driver set as a btusb option (`/etc/modprobe.d/ps5-viola-bt-addr.conf`), and reloads btusb once if the adapter didn't power up after boot | [8](../README.md#wi-fi-and-bluetooth) |

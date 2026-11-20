@@ -11,7 +11,7 @@
 # and cmdline.txt are not touched.
 set -eu
 
-KVER=7.3.4-p1472
+KVER=7.3.5-pc8fe
 PKG=ps5-kernel-$KVER.tar.zst
 URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/kernel}
 BOOT=${PS5_BOOT:-/boot/efi}

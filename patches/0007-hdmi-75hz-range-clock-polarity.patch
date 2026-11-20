@@ -1,0 +1,183 @@
+ps5: hdmi: 75 Hz and other modes on monitors without a max TMDS clock
+
+Base:     linux-7.3.5 + ps5-linux-patches linux.patch at c8fe83a (the 7.3.5-pc8fe
+          kernel of this repo). Apply after linux.patch:
+          patch -p1 < 0007-hdmi-75hz-range-clock-polarity.patch
+Files:    drivers/ps5/hdmi.c, include/linux/ps5.h,
+          drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+
+Some monitors (e.g. an LG 1080p 75 Hz) have no max TMDS clock in their EDID's
+HDMI block, so isHdmiModeValid() capped them at 165 MHz and 1080p @ 75 Hz
+(174.5 MHz) was rejected. Their timings also use +H+V sync, which the HDMI
+bridge's manual-timing path doesn't accept.
+
+ - without a max TMDS value, use the EDID range-limits descriptor's max pixel
+   clock instead (module parameter hdmi.range_clock, default on)
+ - manual-timing modes are sent to the bridge as +H -V
+ - isHdmiManualMode() exported for amdgpu_dm
+
+Tested on a PS5 Fat (FLAVA3): 1920x1080 @ 75 Hz on the reporter's LG, and extra
+VESA modes (e.g. 1280x1024 @ 75 Hz) on a Samsung Odyssey G5; 1440p 144/120/60,
+VRR and HDR unchanged.
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+index d6ff16f7c..ecebc7cf0 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_connector.c
+@@ -1147,6 +1147,12 @@ STATIC_IFN_KUNIT void fill_stream_properties_from_drm_display_mode(
+ 		adjust_colour_depth_from_display_info(timing_out, info);
+ 
+ #ifdef CONFIG_X86_PS5
++	/* FLAVA3 manual timings (e.g. 1080p75): the bridge takes +hsync -vsync only. */
++	if (dm_ps5_is_hdmi_connector(connector_state->connector) &&
++	    isHdmiManualMode(mode_in)) {
++		timing_out->flags.HSYNC_POSITIVE_POLARITY = 1;
++		timing_out->flags.VSYNC_POSITIVE_POLARITY = 0;
++	}
+ 	dm_ps5_set_hdr_timing(timing_out, mode_in, connector_state);
+ 	if (dm_ps5_is_hdmi_connector(connector_state->connector) &&
+ 	    (isHdmiFrlTiming(mode_in) || drm_match_cea_mode(mode_in) == 97)) {
+diff --git a/drivers/ps5/hdmi.c b/drivers/ps5/hdmi.c
+index fb85df351..95220796e 100755
+--- a/drivers/ps5/hdmi.c
++++ b/drivers/ps5/hdmi.c
+@@ -30,6 +30,17 @@ static bool extended_tmds;
+ module_param(extended_tmds, bool, 0444);
+ MODULE_PARM_DESC(extended_tmds, "Offer manual TMDS timings above 297 MHz outside 1440p, e.g. 1080p144-180 (untested, default off)");
+ 
++/*
++ * Sinks whose EDID has no max TMDS clock (no HDMI VSDB, or one without the field) were
++ * limited to 165 MHz, which drops common 1080p 75 Hz monitor timings (~174.5 MHz).
++ * Use the EDID range descriptor's max pixel clock instead, within the TMDS limit
++ * that needs no scrambling.
++ */
++static bool range_clock = true;
++module_param(range_clock, bool, 0644);
++MODULE_PARM_DESC(range_clock, "Without a max TMDS clock in the EDID, allow up to the EDID range limit's max pixel clock (at most 340 MHz) instead of 165 MHz (default on)");
++static unsigned int sink_range_khz;
++
+ static bool frl_4k120 = true;
+ module_param(frl_4k120, bool, 0644);
+ MODULE_PARM_DESC(frl_4k120, "Native FRL on FLAVA3, including 4K100/120 (default on; 0 = disable)");
+@@ -1402,14 +1413,30 @@ static bool isManualTiming(const struct drm_display_mode *mode)
+ 	       isTimingValid(mode);
+ }
+ 
+-static bool isManualMode(const struct drm_display_mode *mode)
++/* Exactly one hsync and one vsync polarity flag, nothing else. */
++static bool hasPlainSyncFlags(const struct drm_display_mode *mode)
+ {
+-	if (!isManualTiming(mode))
+-		return false;
++	u32 h = mode->flags & (DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_NHSYNC);
++	u32 v = mode->flags & (DRM_MODE_FLAG_PVSYNC | DRM_MODE_FLAG_NVSYNC);
++
++	return !(mode->flags & ~(DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_NHSYNC |
++				 DRM_MODE_FLAG_PVSYNC | DRM_MODE_FLAG_NVSYNC)) &&
++	       hweight32(h) == 1 && hweight32(v) == 1;
++}
+ 
++/*
++ * Outside 1440p a manual timing may come with any sync polarity: the GPU stream
++ * to the bridge is sent as +hsync -vsync for these modes (isHdmiManualMode), which
++ * is what FLAVA3 takes for manual timings.
++ */
++static bool isManualMode(const struct drm_display_mode *mode)
++{
+ 	/* 1440p */
+ 	if (mode->hdisplay == 2560 && mode->vdisplay == 1440)
+-		return mode->clock > 340000;
++		return isManualTiming(mode) && mode->clock > 340000;
++
++	if (!hasPlainSyncFlags(mode) || !isTimingValid(mode))
++		return false;
+ 
+ 	/* Above 297 MHz is untested outside 1440p: opt-in only. */
+ 	return (mode->clock <= 297000 || READ_ONCE(extended_tmds)) &&
+@@ -2757,6 +2784,26 @@ int getHdmiExtendedModes(void)
+ }
+ EXPORT_SYMBOL(getHdmiExtendedModes);
+ 
++/* Max TMDS clock for this sink; see range_clock. */
++static int hdmi_tmds_limit_khz(const struct drm_display_info *info)
++{
++	unsigned int khz = READ_ONCE(sink_range_khz);
++
++	if (info->max_tmds_clock)
++		return info->max_tmds_clock;
++	if (!READ_ONCE(range_clock) || !khz)
++		return 165000;
++	return clamp(khz, 165000U, 340000U);
++}
++
++/* FLAVA3 manual timing: the GPU stream must be +hsync -vsync. */
++bool isHdmiManualMode(const struct drm_display_mode *mode)
++{
++	return hdmi_ic_type == HDMI_IC_TYPE_FLAVA3 && getHdmiExtendedModes() &&
++	       isManualMode(mode);
++}
++EXPORT_SYMBOL(isHdmiManualMode);
++
+ bool isHdmiModeValid(const struct drm_display_mode *mode,
+ 		     const struct drm_display_info *info, int force_1080p)
+ {
+@@ -2798,8 +2845,7 @@ bool isHdmiModeValid(const struct drm_display_mode *mode,
+ 		return false;
+ 	}
+ 
+-	/* Default to 165 MHz when the EDID has no HDMI VSDB. */
+-	if (mode->clock > (info->max_tmds_clock ?: 165000))
++	if (mode->clock > hdmi_tmds_limit_khz(info))
+ 		return false;
+ 
+ 	return mode->clock <= 340000 ||
+@@ -2856,6 +2902,24 @@ EXPORT_SYMBOL(ps5_hdmi_bpc_limit);
+ 
+ static DEFINE_MUTEX(hdmi_edid_lock);
+ static const struct drm_edid *real_edid;
++
++/* Max pixel clock of the base block's range limits descriptor, in kHz (0 = none). */
++static unsigned int edid_range_khz(const struct drm_edid *drm_edid)
++{
++	const struct edid *e = drm_edid ? drm_edid_raw(drm_edid) : NULL;
++	int i;
++
++	if (!e)
++		return 0;
++	for (i = 0; i < 4; i++) {
++		const struct detailed_timing *t = &e->detailed_timings[i];
++
++		if (!t->pixel_clock &&
++		    t->data.other_data.type == EDID_DETAIL_MONITOR_RANGE)
++			return t->data.other_data.data.range.pixel_clock_mhz * 10000;
++	}
++	return 0;
++}
+ static struct drm_connector *hdmi_connector;
+ 
+ void ps5_hdmi_set_connector(struct drm_connector *connector)
+@@ -3168,9 +3232,11 @@ void hdmi_notification_handler(struct icc_msg *msg)
+ 		memcpy(last_edid, &msg->data[4], last_edid_size);
+ 		mutex_lock(&hdmi_edid_lock);
+ 		swap(real_edid, edid);
++		WRITE_ONCE(sink_range_khz, edid_range_khz(real_edid));
+ 		mutex_unlock(&hdmi_edid_lock);
+ 		if (real_edid) {
+-			pr_info("got real HDMI EDID, FRL rate %u\n", frl_rate);
++			pr_info("got real HDMI EDID, FRL rate %u, range limit %u MHz\n", frl_rate,
++				READ_ONCE(sink_range_khz) / 1000);
+ 			pr_debug("EDID notification: %u bytes, byte0 %02x (HDCP 2.2 %u, FRL rate %u, %u on this connection), %s %04x crc %08x, EDID FRL rate %u DSC %u, 4:2:2 %s\n",
+ 				 size, byte0, byte0 & 1, frl_rate, rate_max, vendor, product,
+ 				 crc, max_frl, dsc_frl, ycbcr422 ? "yes" : "no");
+diff --git a/include/linux/ps5.h b/include/linux/ps5.h
+index 727310763..d68dd2c00 100755
+--- a/include/linux/ps5.h
++++ b/include/linux/ps5.h
+@@ -184,6 +184,7 @@ void sceHdmiOutputMode(void);
+ int getHdmiConfiguration(void);
+ u32 getHdmiDpAudioN(u32 default_n);
+ bool isHdmiModeStock(const struct drm_display_mode *mode);
++bool isHdmiManualMode(const struct drm_display_mode *mode);
+ bool isHdmiModeFrl(const struct drm_display_mode *mode);
+ bool isHdmiSink422(const struct drm_display_info *info);
+ bool isHdmiModeValid(const struct drm_display_mode *mode,
