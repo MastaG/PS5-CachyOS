@@ -20,7 +20,6 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 
 [ "$(id -u)" = 0 ] || die "run it with sudo (see the top of this script)."
 grep -q 'console=ttyTitania0' /proc/cmdline || die "this doesn't look like Linux on a PS5. Nothing changed."
-[ -f "$BOOT/bzImage" ] && [ -f "$BOOT/initrd.img" ] || die "no $BOOT/bzImage + initrd.img found (boot partition not mounted?). Nothing changed."
 # With two PS5 Linux drives plugged in, /boot/efi can be the OTHER drive's boot partition
 # (both are labelled "boot"). Never write the kernel to another drive.
 # OK when the boot partition is on the same drive as /, or when root= in its cmdline.txt
@@ -44,12 +43,50 @@ if [ -z "${PS5_BOOT:-}" ]; then
 	fi
 fi
 
+# PS5 Pro: ps5-stage-gpu-firmware (installed with the kernel) puts the Viola GPU
+# firmware in the initrd and deploys it with /etc/kernel/postinst.d/zz-update-boot.
+# That hook first renames bzImage + initrd.img to .old, then copies
+# /boot/vmlinuz-<version> + /boot/initrd.img-<version>. Kernels from this repo were
+# only installed to $BOOT, so the copy failed and left $BOOT without a kernel.
+# Put the renamed files back if that happened.
+if [ -s "$BOOT/bzImage.old" ] && [ -s "$BOOT/initrd.img.old" ]; then
+	for f in bzImage initrd.img; do
+		if [ ! -e "$BOOT/$f" ]; then
+			cp "$BOOT/$f.old" "$BOOT/$f.new"; sync; mv "$BOOT/$f.new" "$BOOT/$f"
+			echo "Restored $BOOT/$f from $f.old (a failed PS5 Pro GPU firmware deploy had moved it)."
+		fi
+	done
+	sync
+fi
+[ -f "$BOOT/bzImage" ] && [ -f "$BOOT/initrd.img" ] || die "no $BOOT/bzImage + initrd.img found (boot partition not mounted?). Nothing changed."
+
+# Version of a bzImage, from its setup header (what 'file' shows).
+bz_version() {
+	o=$(od -An -tu2 -j526 -N2 "$1" 2>/dev/null | tr -d ' ')
+	[ -n "$o" ] || return 0
+	dd if="$1" bs=1 skip=$((o + 512)) count=200 2>/dev/null | tr '\0' '\n' | head -1 | cut -d' ' -f1
+}
+# Keep /boot/vmlinuz-<version> (+ initrd) next to the boot partition's kernel, so
+# zz-update-boot finds them when ps5-stage-gpu-firmware runs on a PS5 Pro.
+# keep_boot_copy kernel [initrd]: the initrd is copied when given, or when /boot has none.
+keep_boot_copy() {
+	v=$(bz_version "$1")
+	[ -n "$v" ] && [ -d "/usr/lib/modules/$v" ] || return 0
+	if ! cmp -s "$1" "/boot/vmlinuz-$v"; then
+		install -m644 "$1" "/boot/vmlinuz-$v.new"; mv -f "/boot/vmlinuz-$v.new" "/boot/vmlinuz-$v"
+	fi
+	if [ -n "${2:-}" ] && { [ "${3:-}" = always ] || [ ! -f "/boot/initrd.img-$v" ]; }; then
+		install -m600 "$2" "/boot/initrd.img-$v.new"; mv -f "/boot/initrd.img-$v.new" "/boot/initrd.img-$v"
+	fi
+}
+
 if [ "${1:-}" = "--rollback" ]; then
 	[ -s "$BOOT/bzImage.bak" ] && [ -s "$BOOT/initrd.img.bak" ] || die "no (complete) backup kernel found in $BOOT."
 	for f in bzImage initrd.img; do
 		mv "$BOOT/$f" "$BOOT/$f.tmp"; mv "$BOOT/$f.bak" "$BOOT/$f"; mv "$BOOT/$f.tmp" "$BOOT/$f.bak"
 	done
 	sync
+	keep_boot_copy "$BOOT/bzImage" "$BOOT/initrd.img"
 	echo "Rolled back: the previous kernel is active again (the newer one is now the .bak)."
 	echo "Restart the PS5 and boot Linux as usual."
 	exit 0
@@ -57,6 +94,7 @@ fi
 
 FORCE=0; [ "${1:-}" = "--force" ] && FORCE=1
 if [ "$(uname -r)" = "$KVER" ] && [ $FORCE = 0 ]; then
+	keep_boot_copy "$BOOT/bzImage" "$BOOT/initrd.img"
 	echo "You're already on the newest kernel ($KVER). Nothing to do."
 	exit 0
 fi
@@ -147,6 +185,7 @@ sync
 mv "$BOOT/bzImage.new" "$BOOT/bzImage"
 mv "$BOOT/initrd.img.new" "$BOOT/initrd.img"
 sync
+keep_boot_copy "$BOOT/bzImage" "$BOOT/initrd.img" always
 
 echo
 echo "Done: kernel $KVER installed. Restart the PS5 and boot Linux as usual."
