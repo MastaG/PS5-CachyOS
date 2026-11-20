@@ -8,7 +8,7 @@
 # It runs, in order:
 #   1. update-kernel.sh   newest PS5 kernel + modules + Wi-Fi driver (+ 12-bit colour fix)
 #   2. Fixes:            12-bit colour script only on FLAVA3 (PS5 Slim / VERDE got a colour tint)
-#   3. update-extras.sh   Gaming Mode launcher (refresh rate in Steam, HDR on PS5 Fat, no Steam
+#   3. update-extras.sh   Gaming Mode launcher (refresh rate in Steam, HDR on PS5 Fat/Pro, no Steam
 #                         update loop, performance overlay), desktop Steam -steamos3 override,
 #                         16-thread shader pre-caching, "12-bit Colour" icon
 #   4. FreeSync + 1080p 144 Hz boot options (asks first)
@@ -141,8 +141,10 @@ echo "Your files, apps and settings are not touched. Password needed:"
 sudo -v || exit 1
 
 say "1/7 Kernel"
+KFAIL=0
 if ! fetch update-kernel.sh | kernel_sh; then
-	die "the kernel update failed (see above). Nothing else was changed."
+	KFAIL=1
+	echo "The kernel update failed (see above); your current kernel stays. Continuing with the other steps."
 fi
 
 say "2/7 Fixes"
@@ -213,3 +215,8 @@ echo "All done. Restart PS5 Linux to use the new kernel (if it changed),"
 echo "or log out/in if Plasma, KWin or glibc were updated."
 echo "Next time, just open \"Update PS5 CachyOS\" on the desktop."
 echo "To undo steps 1-6:  curl -fsSL $R/update.sh | sh -s -- --rollback"
+if [ "$KFAIL" = 1 ]; then
+	echo
+	echo "NOTE: the kernel step failed (see the top of the output). Everything else was updated."
+	echo "Run the updater again later, or open an issue with that output."
+fi

@@ -3,7 +3,7 @@
 **Run a full Linux desktop and Steam on a jailbroken PS5.** Flash a ready-made image to a USB SSD, boot it, play.
 
 ![Firmware 13.60](https://img.shields.io/badge/PS5_firmware-13.60-0070d1)
-![Kernel 7.3.4](https://img.shields.io/badge/kernel-7.3.4-333)
+![Kernel 7.3.5](https://img.shields.io/badge/kernel-7.3.5-333)
 ![KDE Plasma 6.8](https://img.shields.io/badge/KDE_Plasma-6.8-1d99f3)
 ![Wayland](https://img.shields.io/badge/Wayland-yes-2ea44f)
 
@@ -154,7 +154,7 @@ The same menu has the **Performance Overlay Level** (fps, CPU/GPU load, temperat
 
 **Desktop HDR:** **System Settings → Display → Enable HDR**. HDR at 4K needs 12-bit colour: click the **12-bit Colour** icon. 
 
-**HDR in Gaming Mode** (PS5 Fat / FLAVA3): turn on HDR in the monitor's menu if it has a setting for it, then quick menu → **Performance** → **Enable HDR**. Steam's SDR brightness slider works too. The PS5 Slim keeps sRGB output without HDR, because HDR signalling gives a black screen on its HDMI chip.
+**HDR in Gaming Mode** (PS5 Fat and Pro / FLAVA3): turn on HDR in the monitor's menu if it has a setting for it, then quick menu → **Performance** → **Enable HDR**. Steam's SDR brightness slider works too. The PS5 Slim keeps sRGB output without HDR, because HDR signalling gives a black screen on its HDMI chip.
 
 **HDMI chip:** check yours with `sudo dmesg | grep "HDMI IC"`. **FLAVA3** (launch model) does HDR and 12-bit colour. **VERDE** (Slim) is limited to 8-bit colour without HDR.
 
@@ -225,8 +225,9 @@ A few `CR` errors in dmesg at boot are normal.
 
 - **Wi-Fi gone after a warm restart (kexec):** turn the PS5 **fully off** (not rest mode) and boot Linux again.
 - **Wi-Fi `unavailable`:** `nmcli radio wifi on`.
-- **PS5 Pro Bluetooth:** the internal adapter needs kernel `patches/0005` + `0006` and `install.sh`'s Bluetooth core fix. Without them the adapter disappears at boot ("wmt command timed out"); a USB Bluetooth dongle works meanwhile. With them Linux uses the PS5 OS Bluetooth address, so a DualSense paired in PS5 OS also works in Linux once its pairing is imported: a loader with pairing export (ps5-linux-loader #97) plus the [ps5-bt-sync importer](https://github.com/ps5-linux/ps5-linux-patches/tree/main/bluetooth).
-- **DualSense:** reconnects on its own. Using it in PS5 OS breaks the Linux pairing, so pair it again. Speaker and headphone jack only work over USB, and don't plug in USB while it's connected over Bluetooth.
+- **PS5 Pro Bluetooth:** works with kernel 7.3.5-pc8fe or newer (the updater installs it, plus the Pro Bluetooth services). On older kernels the internal adapter disappears at boot ("wmt command timed out"); a USB Bluetooth dongle works meanwhile. After using the controller in PS5 OS, it sometimes connects on its second try (about 30 s).
+- **DualSense:** reconnects on its own. Speaker and headphone jack only work over USB, and don't plug in USB while it's connected over Bluetooth.
+- **Pairings from PS5 OS:** with a loader that exports them ([ps5-linux-loader](https://github.com/ps5-linux/ps5-linux-loader) newer than v2.5), controllers paired in PS5 OS work in Linux without pairing again ([ps5-bt-sync](https://github.com/ps5-linux/ps5-linux-patches/tree/main/bluetooth), installed by the updater). A device paired in both uses the PS5 OS pairing: if a keyboard or headset stops connecting in Linux, remove it in PS5 OS (Settings → Accessories) and pair it again in Linux. Without such a loader, using a controller in PS5 OS breaks its Linux pairing, so pair it again.
 
 ### Websites slow to start loading
 

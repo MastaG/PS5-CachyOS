@@ -1,0 +1,56 @@
+#!/bin/bash
+# ps5-splash — full-screen picture on tty1 while switching Gaming Mode <-> Desktop.
+# Draws straight onto the framebuffer console (/dev/fb0) in the gap where neither
+# gamescope nor KWin owns the screen; it never touches DRM, so it can't block a handoff.
+#   ps5-splash gaming|desktop          draw that picture now
+#   ps5-splash gaming --mark           draw, and ask the next tty1 login to redraw it
+#   ps5-splash gaming --mark-only      only ask the next tty1 login to draw it
+#   ps5-splash --pending               redraw if a switch marked one (no-op at boot)
+#   sudo ps5-splash --build            rebuild .raw files after replacing the PNGs
+# Pictures: /usr/local/share/ps5-splash/{gaming,desktop}.png (PNG, 1920x1080).
+DIR=/usr/local/share/ps5-splash
+FB=/dev/fb0
+SYS=/sys/class/graphics/fb0
+PENDING=/tmp/ps5-splash-pending-$(id -u)
+
+case "${1-}" in
+--build)
+    python3 -I - "$DIR" <<'PY'
+import sys
+from PIL import Image
+d = sys.argv[1]
+for n in ("gaming", "desktop"):
+    im = Image.open(f"{d}/{n}.png").convert("RGB").resize((1920, 1080), Image.LANCZOS)
+    open(f"{d}/{n}.raw", "wb").write(im.convert("RGBX").tobytes("raw", "BGRX"))
+    print("built", n)
+PY
+    exit ;;
+--pending)
+    [ -f "$PENDING" ] || exit 0
+    read -r which <"$PENDING"; rm -f "$PENDING" ;;
+gaming|desktop)
+    which=$1
+    case "${2-}" in
+    --mark) echo "$which" >"$PENDING" ;;
+    --mark-only) echo "$which" >"$PENDING"; exit 0 ;;   # no waiting: caller is mid-switch
+    esac ;;
+*)
+    sed -n '2,10p' "$0"; exit 1 ;;
+esac
+
+raw=$DIR/$which.raw
+[ -r "$raw" ] && [ -w "$FB" ] || exit 0
+# Only the 1920x1080 32-bit console mode the .raw files are made for.
+[ "$(cat $SYS/virtual_size 2>/dev/null)" = 1920,1080 ] || exit 0
+[ "$(cat $SYS/bits_per_pixel 2>/dev/null)" = 32 ] || exit 0
+[ "$(cat $SYS/stride 2>/dev/null)" = 7680 ] || exit 0
+# Wait (max 5 s) until no compositor holds the screen, else the console's
+# own redraw on handback would wipe the picture.
+for _ in $(seq 1 25); do
+    pgrep -x 'gamescope|gamescope-wl|kwin_wayland|kwin_wayland_wr' >/dev/null || break
+    sleep 0.2
+done
+# Hide the console cursor and text, then draw.
+printf '\033[?25l\033[2J\033[H' >/dev/tty1 2>/dev/null
+cat "$raw" >"$FB" 2>/dev/null
+exit 0
