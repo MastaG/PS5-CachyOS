@@ -225,7 +225,7 @@ A few `CR` errors in dmesg at boot are normal.
 
 - **Wi-Fi gone after a warm restart (kexec):** turn the PS5 **fully off** (not rest mode) and boot Linux again.
 - **Wi-Fi `unavailable`:** `nmcli radio wifi on`.
-- **PS5 Pro Bluetooth:** the internal adapter needs kernel `patches/0005` + `0006` and `install.sh`'s Bluetooth core fix. Without them the adapter disappears at boot ("wmt command timed out"); a USB Bluetooth dongle works meanwhile.
+- **PS5 Pro Bluetooth:** the internal adapter needs kernel `patches/0005` + `0006` and `install.sh`'s Bluetooth core fix. Without them the adapter disappears at boot ("wmt command timed out"); a USB Bluetooth dongle works meanwhile. With them Linux uses the PS5 OS Bluetooth address, so a DualSense paired in PS5 OS also works in Linux once its pairing is imported: a loader with pairing export (ps5-linux-loader #97) plus the [ps5-bt-sync importer](https://github.com/ps5-linux/ps5-linux-patches/tree/main/bluetooth).
 - **DualSense:** reconnects on its own. Using it in PS5 OS breaks the Linux pairing, so pair it again. Speaker and headphone jack only work over USB, and don't plug in USB while it's connected over Bluetooth.
 
 ### Websites slow to start loading

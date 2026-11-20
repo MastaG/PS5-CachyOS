@@ -114,6 +114,6 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `patches/0005-btusb-ps5-pro-viola-0e8d-3605.patch` | Kernel patch: PS5 Pro internal Bluetooth (HCI on interface 3, ACL on bulk OUT `0x0d`), from [QuartConz/ps5-pro-viola-bluetooth](https://github.com/QuartConz/ps5-pro-viola-bluetooth). Apply after `linux.patch` | [8](../README.md#wi-fi-and-bluetooth) |
 | `patches/0006-bluetooth-l2cap-defer-security-block-while-encryption-pending.patch` | Kernel patch: the DualSense no longer disconnects right after connecting on the PS5 Pro (same source). Apply after `linux.patch` | [8](../README.md#wi-fi-and-bluetooth) |
 | `files/etc/udev/rules.d/50-viola-bt-power.rules`, `files/etc/modprobe.d/viola-btusb.conf` | PS5 Pro Bluetooth: no USB autosuspend (it kills the internal USB controller) | [8](../README.md#wi-fi-and-bluetooth) |
-| `files/usr/local/sbin/ps5-viola-bt-revive`, `files/etc/systemd/system/ps5-viola-bt-revive.service` | PS5 Pro Bluetooth: reloads btusb once if the adapter didn't power up after boot | [8](../README.md#wi-fi-and-bluetooth) |
+| `files/usr/local/sbin/ps5-viola-bt-revive`, `files/etc/systemd/system/ps5-viola-bt-revive.service` | PS5 Pro Bluetooth: saves the PS5 OS Bluetooth address the driver set as a btusb option (`/etc/modprobe.d/ps5-viola-bt-addr.conf`), and reloads btusb once if the adapter didn't power up after boot | [8](../README.md#wi-fi-and-bluetooth) |
 
 The old kernel patches (`0001` Bluetooth, `0002`/`0003` 1440p @ 120 Hz) are gone: ps5-linux-patches `5f6b5d3` does all of that upstream.

@@ -24,14 +24,26 @@ controller is function 2 on IF3.
  - ACL data on bulk OUT 0x0d (0x0b accepts one transfer, then NAKs forever)
  - setup and shutdown route back to wIndex 0 first (setup runs again on
    every power on)
+ - use the PS5 OS Bluetooth address: PS5 OS drives the chip's other
+   Bluetooth function, whose address is one lower than the one Linux gets
+   on IF3 (seen: PS5 OS 9C:37:CB:06:0C:AB, IF3 ...:AC). DualSense pairings
+   imported from PS5 OS (ps5-linux-patches bluetooth/ps5-bt-sync) only
+   reconnect on that address. setup reads the IF3 address (retried, the
+   controller refuses commands for a moment right after boot) and sets the
+   PS5 OS one with btmtk_set_bdaddr() before the HCI core reads it, so
+   bluetoothd and the importer see it from the start. Module options:
+   ps5_viola_bdaddr=AA:BB:CC:DD:EE:FF (exact address), or
+   ps5_viola_bdaddr_offset (default -1, 0 = keep the chip's address),
+   derived once per module load
 
 Tested on a PS5 Pro (Viola), firmware 11.60, with this repo's 7.3.4-p1472
-kernel rebuilt from KERNEL-SOURCE.md: one hci0 with the console's address,
-powered at boot.
+kernel rebuilt from KERNEL-SOURCE.md: one hci0 on the PS5 OS address,
+powered at boot; a DualSense paired in PS5 OS reconnects in Linux with the
+imported pairing.
 
 --- a/drivers/bluetooth/btusb.c
 +++ b/drivers/bluetooth/btusb.c
-@@ -39,6 +39,23 @@
+@@ -39,6 +39,41 @@
  
  static struct usb_driver btusb_driver;
  
@@ -46,6 +58,24 @@ powered at boot.
 +#define PS5_VIOLA_BT_IFNUM	3
 +#define PS5_VIOLA_BT_ACL_OUT_EP	0x0d
 +
++/*
++ * PS5 OS drives the chip's other Bluetooth function, whose address differs
++ * from the one Linux gets on IF3 (seen: PS5 OS ...:AB, IF3 ...:AC). DualSense
++ * pairings imported from PS5 OS only reconnect on the PS5 OS address, so the
++ * address is set during setup, before the HCI core reads it.
++ */
++static char *ps5_viola_bdaddr;
++module_param(ps5_viola_bdaddr, charp, 0444);
++MODULE_PARM_DESC(ps5_viola_bdaddr,
++		 "PS5 Pro: Bluetooth address to use, e.g. the PS5 OS one (AA:BB:CC:DD:EE:FF); empty = derive with ps5_viola_bdaddr_offset");
++static int ps5_viola_bdaddr_offset = -1;
++module_param(ps5_viola_bdaddr_offset, int, 0444);
++MODULE_PARM_DESC(ps5_viola_bdaddr_offset,
++		 "PS5 Pro: without ps5_viola_bdaddr, add this to the chip's own IF3 address once per module load (default -1, 0 = keep)");
++/* Target address, decided on the first setup and kept for every power on. */
++static bdaddr_t ps5_viola_target;
++static bool ps5_viola_target_set;
++
 +static bool btusb_is_ps5_viola(struct usb_device *udev)
 +{
 +	return le16_to_cpu(udev->descriptor.idVendor) == PS5_VIOLA_BT_VID &&
@@ -55,7 +85,7 @@ powered at boot.
  #define BTUSB_IGNORE			BIT(0)
  #define BTUSB_DIGIANSWER		BIT(1)
  #define BTUSB_CSR			BIT(2)
-@@ -85,6 +102,14 @@
+@@ -85,6 +120,14 @@
  	{ USB_DEVICE_AND_INTERFACE_INFO(0x0471, 0x0215, 0xff, 0xff, 0xff),
  	  .driver_info = BTUSB_IGNORE },
  
@@ -70,7 +100,7 @@ powered at boot.
  	/* Generic Bluetooth USB device */
  	{ USB_DEVICE_INFO(0xe0, 0x01, 0x01) },
  
-@@ -2320,7 +2345,11 @@
+@@ -2320,7 +2363,11 @@
  
  	dr->bRequestType = data->cmdreq_type;
  	dr->bRequest     = data->cmdreq;
@@ -83,7 +113,7 @@ powered at boot.
  	dr->wValue       = 0;
  	dr->wLength      = __cpu_to_le16(skb->len);
  
-@@ -3157,6 +3186,7 @@
+@@ -3157,6 +3204,7 @@
  {
  	struct btusb_data *data = hci_get_drvdata(hdev);
  	struct btmtk_data *btmtk_data = hci_get_priv(hdev);
@@ -91,7 +121,7 @@ powered at boot.
  	int err;
  
  	/* MediaTek WMT vendor cmd requiring below USB resources to
-@@ -3168,8 +3198,17 @@
+@@ -3168,8 +3216,17 @@
  	btmtk_data->ctrl_anchor = &data->ctrl_anchor;
  	btmtk_data->reset_sync = btusb_mtk_reset;
  
@@ -110,7 +140,7 @@ powered at boot.
  	    !test_bit(BTMTK_ISOPKT_OVER_INTR, &btmtk_data->flags)) {
  		btmtk_data->isopkt_intf = usb_ifnum_to_if(data->udev, MTK_ISO_IFNUM);
  		btusb_mtk_claim_iso_intf(data);
-@@ -3179,6 +3218,37 @@
+@@ -3179,6 +3236,100 @@
  	if (err)
  		return err;
  
@@ -143,12 +173,75 @@ powered at boot.
 +		/* From here on, route all HCI commands to interface 3 */
 +		data->cmdreq_type = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
 +		bt_dev_info(hdev, "PS5 Pro: IF3 activated, HCI routed to IF3");
++
++		if (!ps5_viola_target_set && ps5_viola_bdaddr && *ps5_viola_bdaddr) {
++			u8 b[6];
++
++			if (sscanf(ps5_viola_bdaddr, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
++				   &b[5], &b[4], &b[3], &b[2], &b[1], &b[0]) == 6) {
++				memcpy(ps5_viola_target.b, b, 6);
++				ps5_viola_target_set = true;
++			} else {
++				bt_dev_warn(hdev, "PS5 Pro: invalid ps5_viola_bdaddr '%s'",
++					    ps5_viola_bdaddr);
++			}
++		}
++
++		if (ps5_viola_target_set || ps5_viola_bdaddr_offset) {
++			struct hci_rp_read_bd_addr *rp;
++			struct sk_buff *skb;
++			int tries;
++
++			/*
++			 * Right after boot the controller can refuse commands
++			 * for a moment (also seen as HCI Reset -16), so retry.
++			 */
++			for (tries = 0; tries < 10; tries++) {
++				skb = __hci_cmd_sync(hdev, HCI_OP_READ_BD_ADDR, 0,
++						     NULL, HCI_INIT_TIMEOUT);
++				if (!IS_ERR(skb) &&
++				    skb->len == sizeof(struct hci_rp_read_bd_addr) &&
++				    !((struct hci_rp_read_bd_addr *)skb->data)->status)
++					break;
++				if (!IS_ERR(skb))
++					kfree_skb(skb);
++				skb = ERR_PTR(-EAGAIN);
++				msleep(300);
++			}
++			if (IS_ERR(skb)) {
++				bt_dev_warn(hdev, "PS5 Pro: reading the address failed (%ld)",
++					    PTR_ERR(skb));
++			} else {
++				rp = (struct hci_rp_read_bd_addr *)skb->data;
++				if (!ps5_viola_target_set && bacmp(&rp->bdaddr, BDADDR_ANY)) {
++					/* first setup of this module load: derive once */
++					u64 v = 0;
++					int i;
++
++					for (i = 5; i >= 0; i--)
++						v = (v << 8) | rp->bdaddr.b[i];
++					v = (v + (s64)ps5_viola_bdaddr_offset) & 0xffffffffffffULL;
++					for (i = 0; i < 6; i++)
++						ps5_viola_target.b[i] = (v >> (8 * i)) & 0xff;
++					ps5_viola_target_set = true;
++				}
++				if (ps5_viola_target_set &&
++				    bacmp(&rp->bdaddr, &ps5_viola_target)) {
++					if (!btmtk_set_bdaddr(hdev, &ps5_viola_target))
++						bt_dev_info(hdev, "PS5 Pro: address %pMR -> %pMR (PS5 OS)",
++							    &rp->bdaddr, &ps5_viola_target);
++					else
++						bt_dev_warn(hdev, "PS5 Pro: setting the address failed");
++				}
++				kfree_skb(skb);
++			}
++		}
 +	}
 +
  	switch (btmtk_data->dev_id) {
  	case 0x7922:
  	case 0x7925:
-@@ -3213,8 +3283,16 @@
+@@ -3213,8 +3364,16 @@
  
  static int btusb_mtk_shutdown(struct hci_dev *hdev)
  {
@@ -165,7 +258,7 @@ powered at boot.
  	ret = btmtk_usb_shutdown(hdev);
  
  	/* Release MediaTek iso interface after shutdown */
-@@ -4346,6 +4424,11 @@
+@@ -4346,6 +4505,11 @@
  
  	BT_DBG("intf %p id %p", intf, id);
  
@@ -177,7 +270,7 @@ powered at boot.
  	if ((id->driver_info & BTUSB_IFNUM_2) &&
  	    (intf->cur_altsetting->desc.bInterfaceNumber != 0) &&
  	    (intf->cur_altsetting->desc.bInterfaceNumber != 2))
-@@ -4401,6 +4484,32 @@
+@@ -4401,6 +4565,32 @@
  	if (id->driver_info & BTUSB_MTK_NO_ISO)
  		set_bit(BTUSB_NO_ISO_INTF, &data->flags);
  
