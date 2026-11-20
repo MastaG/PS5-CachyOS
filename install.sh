@@ -52,6 +52,7 @@ core_dp()     { cmp -s "$F/usr/local/bin/dp-link-lock" /usr/local/bin/dp-link-lo
                 cmp -s "$F/etc/systemd/system/dp-link-lock.service" /etc/systemd/system/dp-link-lock.service; }
 core_ds()     { cmp -s "$F/etc/udev/rules.d/50-viola-bt-power.rules" /etc/udev/rules.d/50-viola-bt-power.rules &&
                 cmp -s "$F/usr/local/sbin/ps5-viola-bt-revive" /usr/local/sbin/ps5-viola-bt-revive &&
+                cmp -s "$F/usr/local/sbin/ps5-viola-bt-reset" /usr/local/sbin/ps5-viola-bt-reset &&
                 cmp -s "$F/etc/systemd/system/bt-connectable.service" /etc/systemd/system/bt-connectable.service &&
                 cmp -s "$F/etc/modules-load.d/dualsense.conf" /etc/modules-load.d/dualsense.conf; }
 core_zram()   { [ -e /etc/systemd/zram-generator.conf ]; }
@@ -165,6 +166,8 @@ put 644 etc/udev/rules.d/50-viola-bt-power.rules /etc/udev/rules.d/50-viola-bt-p
 put 644 etc/modprobe.d/viola-btusb.conf /etc/modprobe.d/viola-btusb.conf "PS5 Pro Bluetooth (btusb option)"
 put 755 usr/local/sbin/ps5-viola-bt-revive /usr/local/sbin/ps5-viola-bt-revive "PS5 Pro Bluetooth (revive script)"
 put 644 etc/systemd/system/ps5-viola-bt-revive.service /etc/systemd/system/ps5-viola-bt-revive.service "PS5 Pro Bluetooth (revive service)"
+put 755 usr/local/sbin/ps5-viola-bt-reset /usr/local/sbin/ps5-viola-bt-reset "PS5 Pro Bluetooth (reset script)"
+put 644 etc/systemd/system/ps5-viola-bt-reset.service /etc/systemd/system/ps5-viola-bt-reset.service "PS5 Pro Bluetooth (reset service)"
 if [ -e /etc/systemd/zram-generator.conf ]; then
     echo "  zram: already installed"
 else
@@ -184,7 +187,7 @@ else
 fi
 
 systemctl daemon-reload
-systemctl enable -q dp-link-lock.service bluetooth.service bt-connectable.service ps5-viola-bt-revive.service
+systemctl enable -q dp-link-lock.service bluetooth.service bt-connectable.service ps5-viola-bt-revive.service ps5-viola-bt-reset.service
 
 # Chrome hardware video decode (README section 7)
 f=$UHOME/.config/chrome-flags.conf

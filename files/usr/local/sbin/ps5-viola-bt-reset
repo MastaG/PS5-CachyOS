@@ -1,0 +1,39 @@
+#!/bin/sh
+# PS5 Pro (Viola) Bluetooth 0e8d:3605, once per boot before ps5-bt-sync and bluetoothd.
+# The chip keeps power through the rest-mode handoff from PS5 OS. When a DualSense was
+# connected in PS5 OS, PS5 OS's own Bluetooth function still answers the controller on
+# the PS5 OS address after Linux has started: the controller connects (light bar solid
+# blue) but never reaches Linux. Reloading btusb runs the chip setup again and fixes it.
+# Before the reload, save the PS5 OS address the driver set (patches/0005) as a btusb
+# option, so the reload keeps it (it can't derive it again from the changed address).
+CONF=/etc/modprobe.d/ps5-viola-bt-addr.conf
+grep -qs 3605 /sys/bus/usb/devices/*/idProduct || exit 0
+# Wait until the first setup is completely done: a btusb reload in the middle of the
+# MediaTek setup breaks the chip until the next cold boot.
+addr() { timeout 5 btmgmt --index 0 info 2>/dev/null | awk '$1=="addr"{print toupper($2);exit}'; }
+ready=
+for i in $(seq 60); do
+	a=$(addr)
+	[ -n "$a" ] && [ "$a" != 00:00:00:00:00:00 ] && { ready=1; break; }
+	sleep 0.5
+done
+[ -n "$ready" ] || { echo "hci0 setup didn't finish in 30 s, not reloading btusb"; exit 0; }
+sleep 1
+if ! grep -qs '^options btusb .*ps5_viola_bdaddr=' /etc/modprobe.d/*.conf; then
+	for i in $(seq 20); do dmesg | grep -q 'PS5 Pro: address .* (PS5 OS)' && break; sleep 0.5; done
+	set=$(dmesg 2>/dev/null | sed -n 's/.*PS5 Pro: address [0-9a-fA-F:]* -> \([0-9a-fA-F:]*\) (PS5 OS).*/\1/p' | head -1 | tr a-f A-F)
+	if [ -z "$set" ]; then
+		echo "the driver set no PS5 OS address yet, not reloading btusb"
+		exit 0
+	fi
+	printf '# PS5 Pro: PS5 OS Bluetooth address, saved by ps5-viola-bt-reset\noptions btusb ps5_viola_bdaddr=%s\n' "$set" > "$CONF"
+	echo "saved the PS5 OS Bluetooth address $set in $CONF"
+fi
+modprobe -r btusb && modprobe btusb || { echo "btusb reload failed"; exit 1; }
+# wait for the second setup too, so ps5-bt-sync and bluetoothd see the final adapter
+for i in $(seq 60); do
+	a=$(addr)
+	[ -n "$a" ] && [ "$a" != 00:00:00:00:00:00 ] && { echo "btusb reloaded, hci0 on $a"; exit 0; }
+	sleep 0.5
+done
+echo "hci0 not ready after the btusb reload"; exit 1
