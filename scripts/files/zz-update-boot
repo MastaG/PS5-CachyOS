@@ -1,0 +1,56 @@
+#!/bin/bash
+# PS5 CachyOS: copy a kernel + initrd to the PS5 boot partition (/boot/efi).
+# Called with the kernel version ($1, default: the running kernel), e.g. by
+# ps5-stage-gpu-firmware on a PS5 Pro after it rebuilt the initrd with the Viola
+# GPU firmware.
+#
+# Safe by design: nothing on the boot partition changes unless the new files are
+# complete. They are copied as .new first; only then are the current files renamed
+# to .old and the .new ones put in their place. Without /boot/vmlinuz-<version>,
+# the kernel already on the boot partition is kept if it is that same version
+# (only the initrd is replaced).
+set -eu
+BOOT=${PS5_BOOT:-/boot/efi}
+SRC=${PS5_SRC:-/boot}
+KVER=${1:-$(uname -r)}
+KERNEL="$SRC/vmlinuz-$KVER"
+INITRD="$SRC/initrd.img-$KVER"
+
+die() { echo "zz-update-boot: $*. $BOOT was not changed." >&2; exit 1; }
+
+# Kernel version from a bzImage's setup header (x86 boot protocol: offset of the
+# version string at 0x20e, relative to 0x200).
+bz_version() {
+	off=$(od -An -tu2 -j526 -N2 "$1" 2>/dev/null | tr -d ' ')
+	[ -n "$off" ] && [ "$off" -gt 0 ] || return 0
+	dd if="$1" bs=1 skip=$((off + 512)) count=128 2>/dev/null | tr '\0' '\n' | head -n1 | cut -d' ' -f1
+}
+
+[ -d "$BOOT" ] || die "$BOOT not found"
+[ -s "$INITRD" ] || die "$INITRD not found"
+if [ ! -s "$KERNEL" ]; then
+	[ -s "$BOOT/bzImage" ] && [ "$(bz_version "$BOOT/bzImage")" = "$KVER" ] ||
+		die "$KERNEL not found, and $BOOT/bzImage is not kernel $KVER"
+	KERNEL=""   # keep the kernel that is already there
+fi
+
+trap 'rm -f "$BOOT/bzImage.new" "$BOOT/initrd.img.new"' EXIT
+rm -f "$BOOT/bzImage.new" "$BOOT/initrd.img.new"
+if [ -n "$KERNEL" ]; then
+	cp "$KERNEL" "$BOOT/bzImage.new" || die "copying the kernel to $BOOT failed (full?)"
+fi
+cp "$INITRD" "$BOOT/initrd.img.new" || die "copying the initrd to $BOOT failed (full?)"
+sync
+
+for f in bzImage initrd.img; do
+	[ -f "$BOOT/$f.new" ] || continue
+	[ ! -f "$BOOT/$f" ] || mv -f "$BOOT/$f" "$BOOT/$f.old"
+	mv -f "$BOOT/$f.new" "$BOOT/$f"
+done
+sync
+trap - EXIT
+if [ -n "$KERNEL" ]; then
+	echo ">> Kernel $KVER deployed to $BOOT"
+else
+	echo ">> Initrd for $KVER deployed to $BOOT (kernel already there)"
+fi

@@ -20,7 +20,6 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 
 [ "$(id -u)" = 0 ] || die "run it with sudo (see the top of this script)."
 grep -q 'console=ttyTitania0' /proc/cmdline || die "this doesn't look like Linux on a PS5. Nothing changed."
-[ -f "$BOOT/bzImage" ] && [ -f "$BOOT/initrd.img" ] || die "no $BOOT/bzImage + initrd.img found (boot partition not mounted?). Nothing changed."
 # With two PS5 Linux drives plugged in, /boot/efi can be the OTHER drive's boot partition
 # (both are labelled "boot"). Never write the kernel to another drive.
 # OK when the boot partition is on the same drive as /, or when root= in its cmdline.txt
@@ -41,6 +40,33 @@ if [ -z "${PS5_BOOT:-}" ]; then
 	bdisk=$(lsblk -no PKNAME "$(findmnt -no SOURCE "$BOOT")" 2>/dev/null || true)
 	if ! { [ -n "$rdisk" ] && [ "$rdisk" = "$bdisk" ]; } && ! boot_root_ok; then
 		die "$BOOT is on another drive ($bdisk) than this system (${rdisk:-?}), and its cmdline.txt doesn't point to this system. Unplug the other PS5 Linux drive and restart, then run this again. If $BOOT really is this system's boot partition, run with PS5_BOOT=$BOOT. Nothing changed."
+	fi
+fi
+
+# PS5 Pro (issue #5): on the first boot, ps5-stage-gpu-firmware ran the old
+# zz-update-boot hook, which renamed bzImage + initrd.img to .old and then failed,
+# so the PS5 had no kernel to boot. Put the .old files back.
+for f in bzImage initrd.img; do
+	if [ ! -f "$BOOT/$f" ] && [ -s "$BOOT/$f.old" ]; then
+		cp "$BOOT/$f.old" "$BOOT/$f.new" && sync && mv "$BOOT/$f.new" "$BOOT/$f" && sync ||
+			die "couldn't restore $BOOT/$f from $f.old."
+		echo "Restored $BOOT/$f from $f.old (it was lost by a failed PS5 Pro GPU firmware update)."
+	fi
+done
+[ -f "$BOOT/bzImage" ] && [ -f "$BOOT/initrd.img" ] || die "no $BOOT/bzImage + initrd.img found (boot partition not mounted?). Nothing changed."
+
+# Replace the old zz-update-boot hook with the safe one (see scripts/files/zz-update-boot).
+# Only on installs that have the hook; the old one is kept outside postinst.d.
+HOOK=/etc/kernel/postinst.d/zz-update-boot
+FILES=${PS5_FILES_URL:-https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/files}
+if [ -f "$HOOK" ] && ! grep -q 'Safe by design' "$HOOK"; then
+	if curl -fsSL --max-time 30 -o "$HOOK.new" "$FILES/zz-update-boot" && grep -q 'Safe by design' "$HOOK.new"; then
+		cp "$HOOK" /etc/kernel/zz-update-boot.bak
+		chmod 755 "$HOOK.new"; mv -f "$HOOK.new" "$HOOK"
+		echo "Boot hook updated: it can no longer leave the boot partition without a kernel (old one kept as /etc/kernel/zz-update-boot.bak)."
+	else
+		rm -f "$HOOK.new"
+		echo "Note: couldn't download the new boot hook; run this again later (PS5 Pro needs it)."
 	fi
 fi
 
