@@ -50,7 +50,9 @@ status() { if "has_$1"; then echo "installed"; else note "$1"; fi; }
 F=$REPO/files
 core_dp()     { cmp -s "$F/usr/local/bin/dp-link-lock" /usr/local/bin/dp-link-lock &&
                 cmp -s "$F/etc/systemd/system/dp-link-lock.service" /etc/systemd/system/dp-link-lock.service; }
-core_ds()     { cmp -s "$F/etc/systemd/system/bt-connectable.service" /etc/systemd/system/bt-connectable.service &&
+core_ds()     { cmp -s "$F/etc/udev/rules.d/50-viola-bt-power.rules" /etc/udev/rules.d/50-viola-bt-power.rules &&
+                cmp -s "$F/usr/local/sbin/ps5-viola-bt-revive" /usr/local/sbin/ps5-viola-bt-revive &&
+                cmp -s "$F/etc/systemd/system/bt-connectable.service" /etc/systemd/system/bt-connectable.service &&
                 cmp -s "$F/etc/modules-load.d/dualsense.conf" /etc/modules-load.d/dualsense.conf; }
 core_zram()   { [ -e /etc/systemd/zram-generator.conf ]; }
 core_boot()   { f=/etc/systemd/system/ps5-stage-firmware.service; [ ! -f "$f" ] || grep -q '^DefaultDependencies=no' "$f"; }
@@ -157,6 +159,12 @@ put 755 usr/local/bin/dp-link-lock /usr/local/bin/dp-link-lock "black screen loc
 put 644 etc/systemd/system/dp-link-lock.service /etc/systemd/system/dp-link-lock.service "black screen lock (service)"
 put 644 etc/systemd/system/bt-connectable.service /etc/systemd/system/bt-connectable.service "DualSense reconnect"
 put 644 etc/modules-load.d/dualsense.conf /etc/modules-load.d/dualsense.conf "DualSense modules"
+# PS5 Pro Bluetooth (0e8d:3605, kernel patches/0005+0006): no USB autosuspend, one btusb reload
+# if the adapter didn't power up after boot. Both do nothing on other models.
+put 644 etc/udev/rules.d/50-viola-bt-power.rules /etc/udev/rules.d/50-viola-bt-power.rules "PS5 Pro Bluetooth (no autosuspend)"
+put 644 etc/modprobe.d/viola-btusb.conf /etc/modprobe.d/viola-btusb.conf "PS5 Pro Bluetooth (btusb option)"
+put 755 usr/local/sbin/ps5-viola-bt-revive /usr/local/sbin/ps5-viola-bt-revive "PS5 Pro Bluetooth (revive script)"
+put 644 etc/systemd/system/ps5-viola-bt-revive.service /etc/systemd/system/ps5-viola-bt-revive.service "PS5 Pro Bluetooth (revive service)"
 if [ -e /etc/systemd/zram-generator.conf ]; then
     echo "  zram: already installed"
 else
@@ -176,7 +184,7 @@ else
 fi
 
 systemctl daemon-reload
-systemctl enable -q dp-link-lock.service bluetooth.service bt-connectable.service
+systemctl enable -q dp-link-lock.service bluetooth.service bt-connectable.service ps5-viola-bt-revive.service
 
 # Chrome hardware video decode (README section 7)
 f=$UHOME/.config/chrome-flags.conf

@@ -1,0 +1,13 @@
+#!/bin/sh
+# PS5 Pro (Viola) Bluetooth 0e8d:3605: right after boot the first HCI Reset can fail
+# ("Opcode 0x0c03 failed"), leaving hci0 unpowered. Reloading btusb once fixes it
+# (QuartConz/ps5-pro-viola-bluetooth, known limitation).
+ok() { timeout 5 btmgmt --index 0 info 2>/dev/null | grep -i 'current settings' | grep -qw powered; }
+grep -qs 3605 /sys/bus/usb/devices/*/idProduct || exit 0
+for i in $(seq 15); do ok && exit 0; sleep 1; done
+echo "hci0 not powered after 15 s, reloading btusb"
+systemctl stop bluetooth
+modprobe -r btusb && modprobe btusb
+systemctl start bluetooth
+for i in $(seq 15); do ok && { echo "hci0 powered after reload"; exit 0; }; sleep 1; done
+echo "hci0 still not powered"; exit 1
