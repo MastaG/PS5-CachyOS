@@ -415,6 +415,7 @@ if [ "$(sha256sum "$SYNC" 2>/dev/null | cut -d' ' -f1)" = "$SYNC_SHA" ] &&
    systemctl -q is-enabled ps5-bt-sync.service 2>/dev/null; then
 	echo "PS5 OS pairing import: already installed."
 else
+	mkdir -p "$(dirname "$SYNC")"
 	curl -fsSL --max-time 60 -o "$SYNC.new" "$SYNC_URL" ||
 		{ rm -f "$SYNC.new"; die "couldn't download ps5-bt-sync (are you online?). The extras above are installed."; }
 	[ "$(sha256sum "$SYNC.new" | cut -d' ' -f1)" = "$SYNC_SHA" ] ||
