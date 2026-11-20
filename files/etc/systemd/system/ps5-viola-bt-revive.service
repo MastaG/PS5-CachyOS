@@ -1,0 +1,11 @@
+[Unit]
+Description=PS5 Pro: reload btusb once if the internal Bluetooth didn't power up
+After=bluetooth.service
+Wants=bluetooth.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ps5-viola-bt-revive
+
+[Install]
+WantedBy=multi-user.target

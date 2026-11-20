@@ -16,7 +16,7 @@ sha256sum ps5-cachyos.img.xz     # must match the checksum on the release page
 | Fix | Problem | Files |
 |---|---|---|
 | **Black screen lock** | Black screen below 4K (link drops below HBR3) | `dp-link-lock` + `.service` |
-| **DualSense reconnect** | Adapter starts non-connectable, so the controller pairs once and never reconnects | `bt-connectable.service`, `dualsense.conf` |
+| **DualSense reconnect** | Adapter starts non-connectable, so the controller pairs once and never reconnects. On the PS5 Pro the controller also often connects to PS5 OS's Bluetooth function (solid blue, no player light) unless Linux scans fast | `bt-connectable.service`, `dualsense.conf`, `FastConnectable = true` in `/etc/bluetooth/main.conf` |
 | **Boot-order fix** | `ps5-stage-firmware.service` creates an ordering cycle, so systemd skips `systemd-sysctl` and `systemd-modules-load` | `DefaultDependencies=no` in that service |
 | **zram swap** | No swap | `zram-generator.conf` (ram/2, zstd) |
 | **Chrome video flags** | No hardware decode in Chrome | `chrome-flags.conf` |
@@ -54,6 +54,7 @@ git -C ps5-linux-patches checkout 5f6b5d3
 ```sh
 cd ~/kernel/linux-7.2.3
 patch -p1 < ../ps5-linux-patches/linux.patch
+for p in ~/PS5-CachyOS/patches/000[56]-*.patch; do patch -p1 < "$p"; done   # PS5 Pro Bluetooth (path to this repo)
 cp ../ps5-linux-patches/.config .config
 scripts/config --set-str LOCALVERSION "-ps5"    # names it 7.2.3-ps5, so it doesn't clash with the image's kernel
 make olddefconfig
@@ -110,5 +111,10 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `files/home/steam/.config/ps5-next-session` | Session file (`plasma`) | [4](../README.md#4-gaming-mode-and-the-desktop) |
 | `files/boot/efi/cmdline.txt.example` | Kernel command line | [8](../README.md#drive-not-found-at-boot) |
 | `patches/0004-mwifiex-txpower-bounded-wait.patch` | Wi-Fi driver patch that stops a stuck firmware from freezing all networking | [8](../README.md#wi-fi-and-bluetooth) |
+| `patches/0005-btusb-ps5-pro-viola-0e8d-3605.patch` | Kernel patch: PS5 Pro internal Bluetooth (HCI on interface 3, ACL on bulk OUT `0x0d`), from [QuartConz/ps5-pro-viola-bluetooth](https://github.com/QuartConz/ps5-pro-viola-bluetooth). Apply after `linux.patch` | [8](../README.md#wi-fi-and-bluetooth) |
+| `patches/0006-bluetooth-l2cap-defer-security-block-while-encryption-pending.patch` | Kernel patch: the DualSense no longer disconnects right after connecting on the PS5 Pro (same source). Apply after `linux.patch` | [8](../README.md#wi-fi-and-bluetooth) |
+| `files/etc/udev/rules.d/50-viola-bt-power.rules`, `files/etc/modprobe.d/viola-btusb.conf` | PS5 Pro Bluetooth: no USB autosuspend (it kills the internal USB controller) | [8](../README.md#wi-fi-and-bluetooth) |
+| `files/usr/local/sbin/ps5-viola-bt-reset`, `files/etc/systemd/system/ps5-viola-bt-reset.service` | PS5 Pro Bluetooth: reloads btusb once at boot (after the first setup, before the pairing import and bluetoothd). The chip keeps power through the rest-mode handoff, and a DualSense used in PS5 OS otherwise stays caught by PS5 OS's Bluetooth function | [8](../README.md#wi-fi-and-bluetooth) |
+| `files/usr/local/sbin/ps5-viola-bt-revive`, `files/etc/systemd/system/ps5-viola-bt-revive.service` | PS5 Pro Bluetooth: saves the PS5 OS Bluetooth address the driver set as a btusb option (`/etc/modprobe.d/ps5-viola-bt-addr.conf`), and reloads btusb once if the adapter didn't power up after boot | [8](../README.md#wi-fi-and-bluetooth) |
 
 The old kernel patches (`0001` Bluetooth, `0002`/`0003` 1440p @ 120 Hz) are gone: ps5-linux-patches `5f6b5d3` does all of that upstream.

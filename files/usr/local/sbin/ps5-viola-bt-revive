@@ -1,0 +1,25 @@
+#!/bin/sh
+# PS5 Pro (Viola) Bluetooth 0e8d:3605, runs once per boot after bluetooth.service.
+# 1. Keep the PS5 OS Bluetooth address: btusb (patches/0005) sets it during setup,
+#    derived from the chip's own address. Save it as a module option the first
+#    time, so a later btusb reload uses it as is (a reload can't derive it again,
+#    the chip then already reports the changed address).
+# 2. Right after boot the first HCI Reset can fail ("Opcode 0x0c03 failed"),
+#    leaving hci0 unpowered. Reloading btusb once fixes it.
+CONF=/etc/modprobe.d/ps5-viola-bt-addr.conf
+grep -qs 3605 /sys/bus/usb/devices/*/idProduct || exit 0
+if ! grep -qs '^options btusb .*ps5_viola_bdaddr=' /etc/modprobe.d/*.conf; then
+	set=$(dmesg 2>/dev/null | sed -n 's/.*PS5 Pro: address [0-9a-fA-F:]* -> \([0-9a-fA-F:]*\) (PS5 OS).*/\1/p' | head -1 | tr a-f A-F)
+	if [ -n "$set" ]; then
+		printf '# PS5 Pro: PS5 OS Bluetooth address, saved by ps5-viola-bt-revive\noptions btusb ps5_viola_bdaddr=%s\n' "$set" > "$CONF"
+		echo "saved the PS5 OS Bluetooth address $set in $CONF"
+	fi
+fi
+ok() { timeout 5 btmgmt --index 0 info 2>/dev/null | grep -i 'current settings' | grep -qw powered; }
+for i in $(seq 15); do ok && exit 0; sleep 1; done
+echo "hci0 not powered after 15 s, reloading btusb"
+systemctl stop bluetooth
+modprobe -r btusb && modprobe btusb
+systemctl start bluetooth
+for i in $(seq 15); do ok && { timeout 5 btmgmt --index 0 connectable on >/dev/null 2>&1; echo "hci0 powered after reload"; exit 0; }; sleep 1; done
+echo "hci0 still not powered"; exit 1

@@ -1,0 +1,11 @@
+[Unit]
+Description=PS5 Pro: reset the internal Bluetooth after the handoff from PS5 OS
+After=systemd-modules-load.service systemd-udev-settle.service
+Before=ps5-bt-sync.service bluetooth.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ps5-viola-bt-reset
+
+[Install]
+WantedBy=bluetooth.service
