@@ -95,7 +95,8 @@ The PS5 boots into **Gaming Mode**: Steam's console interface, as on SteamOS.
 - **Quick menu** (performance overlay, frame limit, FreeSync): <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>, also in a game. See [FreeSync in Gaming Mode](#freesync-in-gaming-mode).
 - **Display and network settings** are in Steam's settings, as on a Steam Deck.
 - **Steam's Restart** is a real reboot, so it takes you back to PS5 OS.
-- **Desktop on every boot instead:** `echo plasma > ~/.config/ps5-next-session` (`gamescope` to switch back).
+- **Switch to Desktop** lasts until the next restart: every boot starts in Gaming Mode, as on SteamOS (from the [updater](#5-updating)'s Gaming Mode extras on).
+- **Desktop on every boot instead:** `echo plasma > ~/.config/ps5-boot-session` (`gamescope` to switch back). Before the updater's extras: `echo plasma > ~/.config/ps5-next-session`.
 
 ![Steam's power menu with Switch to Desktop](images/switch-to-desktop.jpg)
 

@@ -16,6 +16,8 @@
 #   - HDR in Gaming Mode (quick menu -> Performance -> Enable HDR) on the PS5 Fat (FLAVA3 HDMI chip).
 #     PS5 Slim (VERDE) keeps sRGB output without HDR.
 #   - "12-bit Colour" desktop icon (sets the colour resolution to 12 bits, needed for HDR at 4K).
+#   - Gaming Mode on every boot, as on SteamOS: "Switch to Desktop" lasts until the next restart.
+#     The desktop on every boot is a choice in ~/.config/ps5-boot-session (plasma or gamescope).
 # Needs the SteamOS-style Gaming Mode of the 2026-11-10 image or newer. The Gaming Mode launcher
 # /usr/bin/gamescope-session-ps5 is replaced only if it's a known image version (or with --force);
 # the old one is kept as .bak-extras for --rollback.
@@ -32,6 +34,7 @@ SRGB_LUA_NAME=ps5-display.lua   # gamescope sRGB override in ~/.config/gamescope
 MENU=/usr/local/bin/ps5-gaming-mode-refresh
 BIT12=/usr/local/bin/ps5-12bit-colour
 SYS_STEAM=/usr/share/applications/steam.desktop
+BOOTSES_UNIT=/etc/systemd/system/ps5-boot-session.service
 SHADER_LINE="unShaderBackgroundProcessingThreads 16"   # PS5: 8 cores / 16 threads on every model
 URL=https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh
 
@@ -55,6 +58,8 @@ OVR="$APPS/steam.desktop"
 STEAMDIR="$H/.local/share/Steam"
 DEVCFG="$STEAMDIR/steam_dev.cfg"
 SRGB_LUA="$H/.config/gamescope/scripts/$SRGB_LUA_NAME"
+NEXTSES="$H/.config/ps5-next-session"   # read by ps5-tty-session.sh at every tty1 login
+BOOTSES="$H/.config/ps5-boot-session"   # what every boot starts with (copied to NEXTSES)
 # HDMI chip: FLAVA3 (PS5 Fat) does HDR; VERDE (PS5 Slim) needs the sRGB override.
 IC=$(dmesg 2>/dev/null | sed -n 's/.*HDMI IC Type \[\([A-Za-z0-9]*\)\].*/\1/p' | head -1)
 [ -n "$IC" ] || IC=$(journalctl -k -b 2>/dev/null | sed -n 's/.*HDMI IC Type \[\([A-Za-z0-9]*\)\].*/\1/p' | head -1)
@@ -105,6 +110,12 @@ if [ "${1:-}" = "--rollback" ]; then
 		mv "$DEVCFG.bak-extras" "$DEVCFG" && echo "Your own steam_dev.cfg restored."
 	elif [ "$(cat "$DEVCFG" 2>/dev/null)" = "$SHADER_LINE" ]; then
 		rm -f "$DEVCFG" && echo "Shader threads setting removed (Steam default again)."
+	fi
+	if [ -f "$BOOTSES_UNIT" ]; then
+		systemctl disable ps5-boot-session.service 2>/dev/null || true
+		rm -f "$BOOTSES_UNIT"
+		systemctl daemon-reload 2>/dev/null || true
+		echo "Boot session reset removed: the PS5 boots into whatever session was used last again."
 	fi
 	sync
 	echo "Undone."
@@ -284,6 +295,39 @@ if [ -f "$MENU" ]; then
 	echo "Gaming Mode Refresh Rate icon removed: choose the refresh rate in Steam -> Settings -> Display."
 fi
 
+# Gaming Mode on every boot, as on SteamOS. "Switch to Desktop" writes plasma to ps5-next-session,
+# and only a desktop logout resets it, so a restart from the desktop booted into the desktop again.
+# A boot-time unit now copies ps5-boot-session to ps5-next-session before tty1 logs in.
+# New file: gamescope (the README's default). Pick the desktop on every boot with
+#   echo plasma > ~/.config/ps5-boot-session
+if [ ! -f "$BOOTSES" ]; then
+	udir "$H/.config"
+	echo gamescope > "$BOOTSES"
+	chown "$U:" "$BOOTSES"
+	echo "Boot session: Gaming Mode on every boot. For the desktop on every boot instead:"
+	echo "  echo plasma > ~/.config/ps5-boot-session"
+fi
+cat > "$BOOTSES_UNIT.new" <<PS5EOF
+[Unit]
+Description=PS5: start the session from ps5-boot-session on every boot
+DefaultDependencies=no
+After=local-fs.target
+RequiresMountsFor=$H
+Before=getty@tty1.service
+ConditionPathExists=$BOOTSES
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'cp "$BOOTSES" "$NEXTSES" && chown "$U:" "$NEXTSES"'
+
+[Install]
+WantedBy=multi-user.target
+PS5EOF
+mv "$BOOTSES_UNIT.new" "$BOOTSES_UNIT"
+systemctl daemon-reload
+systemctl enable ps5-boot-session.service 2>/dev/null
+echo "Boot session: $(cat "$BOOTSES") on every boot (~/.config/ps5-boot-session)."
+
 echo "Installing the 12-bit colour script..."
 	cat > "$BIT12" <<'PS5EOF'
 #!/bin/sh
@@ -322,6 +366,8 @@ echo "  - Faster shader pre-caching (all 16 threads)."
 echo "  - Refresh rate in Steam -> Settings -> Display (also live, in Gaming Mode)."
 echo "  - HDR in Gaming Mode (quick menu -> Performance) on the PS5 Fat."
 echo "  - 12-bit Colour icon on the desktop."
+echo "  - Gaming Mode on every boot; Switch to Desktop lasts until the next restart"
+echo "    (desktop on every boot: echo plasma > ~/.config/ps5-boot-session)."
 echo "If KDE asks whether to trust an icon the first time you click it, choose 'Continue'."
 echo "Undo with:"
 echo "  curl -fsSL $URL | sudo sh -s -- --rollback"

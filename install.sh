@@ -34,7 +34,10 @@ has_dns() {
     done
     [ $n = 1 ]
 }
-has_desktop() { [ "$(cat "$UHOME/.config/ps5-next-session" 2>/dev/null)" = plasma ]; }
+has_desktop() {
+    [ "$(cat "$UHOME/.config/ps5-boot-session" 2>/dev/null)" = plasma ] ||
+    { [ ! -f "$UHOME/.config/ps5-boot-session" ] && [ "$(cat "$UHOME/.config/ps5-next-session" 2>/dev/null)" = plasma ]; }
+}
 
 # --- pick the extras: menu, or yes/no questions without whiptail
 EXTRAS="fan wifi dns desktop"
@@ -236,8 +239,11 @@ fi
 
 if picked desktop; then
     install -d -o "$USR" -g "$USR" "$UHOME/.config"
-    echo plasma > "$UHOME/.config/ps5-next-session"
-    chown "$USR:$USR" "$UHOME/.config/ps5-next-session"
+    # ps5-boot-session: every boot (update-extras.sh); ps5-next-session: the next login
+    for f in ps5-boot-session ps5-next-session; do
+        echo plasma > "$UHOME/.config/$f"
+        chown "$USR:$USR" "$UHOME/.config/$f"
+    done
     echo "  boot to desktop: set"
 fi
 

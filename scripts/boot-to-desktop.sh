@@ -6,4 +6,5 @@ s=${1:-plasma}
 case "$s" in plasma|gamescope) ;; *) echo "usage: $0 [plasma|gamescope]"; exit 1 ;; esac
 mkdir -p "$HOME/.config"
 echo "$s" > "$HOME/.config/ps5-next-session"
+echo "$s" > "$HOME/.config/ps5-boot-session"   # every boot, with the boot unit from update-extras.sh
 echo "next boot will start: $s  (reboot to apply)"
