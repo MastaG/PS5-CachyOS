@@ -16,7 +16,7 @@ sha256sum ps5-cachyos.img.xz     # must match the checksum on the release page
 | Fix | Problem | Files |
 |---|---|---|
 | **Black screen lock** | Black screen below 4K (link drops below HBR3) | `dp-link-lock` + `.service` |
-| **DualSense reconnect** | Adapter starts non-connectable, so the controller pairs once and never reconnects | `bt-connectable.service`, `dualsense.conf` |
+| **DualSense reconnect** | Adapter starts non-connectable, so the controller pairs once and never reconnects. On the PS5 Pro the controller also often connects to PS5 OS's Bluetooth function (solid blue, no player light) unless Linux scans fast | `bt-connectable.service`, `dualsense.conf`, `FastConnectable = true` in `/etc/bluetooth/main.conf` |
 | **Boot-order fix** | `ps5-stage-firmware.service` creates an ordering cycle, so systemd skips `systemd-sysctl` and `systemd-modules-load` | `DefaultDependencies=no` in that service |
 | **zram swap** | No swap | `zram-generator.conf` (ram/2, zstd) |
 | **Chrome video flags** | No hardware decode in Chrome | `chrome-flags.conf` |

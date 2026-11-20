@@ -54,7 +54,8 @@ core_ds()     { cmp -s "$F/etc/udev/rules.d/50-viola-bt-power.rules" /etc/udev/r
                 cmp -s "$F/usr/local/sbin/ps5-viola-bt-revive" /usr/local/sbin/ps5-viola-bt-revive &&
                 cmp -s "$F/usr/local/sbin/ps5-viola-bt-reset" /usr/local/sbin/ps5-viola-bt-reset &&
                 cmp -s "$F/etc/systemd/system/bt-connectable.service" /etc/systemd/system/bt-connectable.service &&
-                cmp -s "$F/etc/modules-load.d/dualsense.conf" /etc/modules-load.d/dualsense.conf; }
+                cmp -s "$F/etc/modules-load.d/dualsense.conf" /etc/modules-load.d/dualsense.conf &&
+                grep -q '^FastConnectable *= *true' /etc/bluetooth/main.conf; }
 core_zram()   { [ -e /etc/systemd/zram-generator.conf ]; }
 core_boot()   { f=/etc/systemd/system/ps5-stage-firmware.service; [ ! -f "$f" ] || grep -q '^DefaultDependencies=no' "$f"; }
 core_chrome() { [ -e "$UHOME/.config/chrome-flags.conf" ]; }
@@ -160,6 +161,18 @@ put 755 usr/local/bin/dp-link-lock /usr/local/bin/dp-link-lock "black screen loc
 put 644 etc/systemd/system/dp-link-lock.service /etc/systemd/system/dp-link-lock.service "black screen lock (service)"
 put 644 etc/systemd/system/bt-connectable.service /etc/systemd/system/bt-connectable.service "DualSense reconnect"
 put 644 etc/modules-load.d/dualsense.conf /etc/modules-load.d/dualsense.conf "DualSense modules"
+# Fast connectable: page scan every 160 ms instead of 1.28 s. On the PS5 Pro the chip's other
+# Bluetooth function (PS5 OS, same address) also answers the DualSense; with the slow default the
+# controller often connects there instead (solid blue, no player light, nothing reaches Linux).
+# bluetoothd applies it every time the adapter comes up, also after a btusb reload.
+f=/etc/bluetooth/main.conf
+if grep -q '^FastConnectable *= *true' "$f"; then
+    echo "  Bluetooth fast connectable: already installed"
+elif grep -q '^#\?FastConnectable' "$f"; then
+    sed -i 's/^#\?FastConnectable *=.*/FastConnectable = true/' "$f"; echo "  Bluetooth fast connectable: installed"
+else
+    sed -i '/^\[General\]/a FastConnectable = true' "$f"; echo "  Bluetooth fast connectable: installed"
+fi
 # PS5 Pro Bluetooth (0e8d:3605, kernel patches/0005+0006): no USB autosuspend, one btusb reload
 # if the adapter didn't power up after boot. Both do nothing on other models.
 put 644 etc/udev/rules.d/50-viola-bt-power.rules /etc/udev/rules.d/50-viola-bt-power.rules "PS5 Pro Bluetooth (no autosuspend)"
