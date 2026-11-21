@@ -23,6 +23,7 @@
 
 ## Contents
 
+0. [What this fork changes](#what-this-fork-changes)
 1. [Flash the image](#1-flash-the-image)
 2. [Boot into Linux](#2-boot-into-linux) (and [the loader](#the-loader), [autoloading it from USB](#optional-autoload-the-loader-from-the-usb-ssd))
 3. [First boot and getting online](#3-first-boot-and-getting-online)
@@ -30,7 +31,7 @@
 5. [Updating](#5-updating) (and [snapshots](#snapshots))
 6. [Display, FreeSync and HDR](#6-display-freesync-and-hdr)
 7. [Extras: boost, fan and video](#7-extras-boost-fan-and-video)
-8. [Emulators](#8-emulators)
+8. [Emulators](#8-emulators) (and [Proton with FSR 4](#proton-with-fsr-4))
 9. [AI and GPU compute](#9-ai-and-gpu-compute)
 10. [Installing to the internal M.2](#10-installing-to-the-internal-m2)
 11. [Troubleshooting](#11-troubleshooting)
@@ -38,6 +39,29 @@
 [Advanced](docs/advanced.md): the official image, building your own kernel, what's in this repo.
 
 ---
+
+## What this fork changes
+
+Everything upstream's image has is still in this one (Gaming Mode, HDR, FreeSync, Wi-Fi, the updater). On top:
+
+| | Upstream ([abrocoma/PS5-CachyOS](https://github.com/abrocoma/PS5-CachyOS)) | This fork |
+|---|---|---|
+| **File system** | ext4 | **btrfs** with CachyOS's subvolumes (`@`, `@home`, `@root`, `@srv`, `@cache`, `@log`, `@tmp`), zstd compression, **snapper** snapshots before and after every pacman run, btrfs Assistant |
+| **Kernel** | 7.3.5-pc8fe | **7.3.5-pc8fe-bc1**: the same kernel plus the GFX1013 **amdgpu/KFD fixes** of [linux-cachyos-bc250](https://github.com/MastaG/linux-cachyos-bc250) (`patches/0008`-`0016`), which make GPU compute reliable: [KytyPS5-Native](#8-emulators) and [AI/LLM work](#9-ai-and-gpu-compute) (llama.cpp, ComfyUI, ROCm). Upstream's kernel stays on the boot partition as the `.bak` fallback |
+| **Kernel command line** | | the BC-250's compute settings (`ttm.pages_limit`, `amdgpu.sched_policy=2`, `cwsr_enable=0`, `vm_update_mode=0`, `bc250_gfx_eop_events=2`) and zswap |
+| **Mesa** | Arch's | the BC-250 Mesa from `[bc250-cachyos]`: built for Zen 2, GFX1013 compute queue fix, FSR 4 support. Mesh shaders (DirectMesh) stay off on the PS5: they hang the PS5 Pro's GPU in Vulkan CTS |
+| **Swap** | zram | a swap file in its own subvolume (32 GB on a 128 GB+ drive) with zswap in front |
+| **Gaming Mode** | boots the mode used last | boots **Gaming Mode every time**; Steam runs as a user service, so KytyPS5 can close Steam while a game runs and bring it back |
+| **Desktop** | | Steam starts in the background with the desktop |
+| **Emulators** | | the [bc250-emulators](https://github.com/MastaG/bc250-emulators) repo is set up (nothing installed): KytyPS5-Native, Lichii, with Steam shortcuts in collections |
+| **Proton** | | the [FSR 4 Proton builds](#proton-with-fsr-4) are available from `[bc250-cachyos]` |
+| **Boost** | an `install.sh` extra | `sudo ps5-boost on` / `off`, off by default |
+| **Fan** | quiet curve | a smoother curve (no silent-to-loud jumps) |
+| **Internal M.2** | | `sudo ps5-install-m2` |
+| **Loader** | soniciso1's releases | the same loader built from his main branch with [PR #31](https://github.com/soniciso1/ps5-linux-loader/pull/31) (PS5 Pro pairing export), until he releases it ([the loader](#the-loader)) |
+| **Other** | | NTP clock sync on, `steam` in the `render` group, base-devel and git preinstalled, updates from this fork |
+
+**PS5 Pro Bluetooth** (internal adapter, DualSense, pairings from PS5 OS) works in both: those fixes were made here and are part of upstream's image too. The full list of files the build changes: [image/README.md](image/README.md).
 
 ## 1. Flash the image
 
@@ -266,6 +290,19 @@ lichii-steam-sync           # game files in ~/Games/Switch2
 ```
 
 Run them again after adding or removing games (`--dry-run` shows what would change). They stop and restart Steam to write its shortcut list. In Gaming Mode, KytyPS5 closes Steam while a game runs (more memory for the game) and brings it back when the game ends. See the [bc250-emulators README](https://github.com/MastaG/bc250-emulators) for the settings of each emulator.
+
+### Proton with FSR 4
+
+The `[bc250-cachyos]` repo has three Proton builds with **FSR 4** ready to use (the AMD FSR 4 provider, OptiScaler and a known-good configuration inside): `proton-cachyos-native-bc250` (fastest, no anti-cheat games), `proton-cachyos-slr-bc250` (Steam Linux Runtime, anti-cheat games) and `protonge-latest-bc250` (GE-Proton). Install them **one by one**:
+
+```sh
+sudo pacman -S proton-cachyos-native-bc250 proton-cachyos-slr-bc250 protonge-latest-bc250
+```
+
+> [!WARNING]
+> **Don't install `linux-cachyos-bc250-meta`** on the PS5: it pulls in the BC-250 kernel, which doesn't boot on a PS5. The PS5 kernel comes from this repo's updater.
+
+Restart Steam, then pick one under a game's **Properties → Compatibility**. How to use them, per-game settings and the anti-cheat caveats: [FSR4-capable Proton](https://github.com/MastaG/linux-cachyos-bc250#fsr4-capable-proton-opt-in) in linux-cachyos-bc250's README, details in [FSR4-PROTON.md](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/FSR4-PROTON.md).
 
 ## 9. AI and GPU compute
 
