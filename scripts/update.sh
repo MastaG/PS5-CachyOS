@@ -57,14 +57,17 @@ key() {
 	case "$k" in '\n'|'\r') echo enter ;; 033) [ -z "$more" ] && echo esc || echo other ;; *) echo "$k" ;; esac
 }
 ask() { # ask "question" default(y|n, used only without a keyboard)
-	printf '%s  %s?%s %s %s[Enter = continue, Esc = abort]%s ' "$CL" "$YEL" "$OFF" "$1" "$DIM" "$OFF"
+	printf '%s  %s?%s %s\n    %sEnter = continue    Esc = abort%s' "$CL" "$YEL" "$OFF" "$1" "$DIM" "$OFF"
 	while :; do
 		case $(key) in
-		enter|y|Y) echo continue; return 0 ;;
-		esc|n|N) echo aborted; return 1 ;;
-		none) [ "$2" = y ] && { echo yes; return 0; }; echo no; return 1 ;;
+		enter|y|Y) a=0; break ;;
+		esc|n|N) a=1; break ;;
+		none) [ "$2" = y ] && a=0 || a=1; break ;;
 		esac
 	done
+	# remove the question again; the step's result line takes its place
+	if [ -n "$CL" ]; then printf '\r\033[K\033[1A\r\033[K'; else echo; fi
+	return $a
 }
 # ?t=<time>: skip GitHub's 5-minute cache, so a fix is used right after it's pushed
 fetch() { curl -fsSL "$R/$1?t=$(date +%s)" || die "couldn't download $1 (are you online?)"; }
@@ -249,7 +252,7 @@ elif ask "Turn on FreeSync (VRR) and 1080p 144 Hz? Safe to leave on." y; then
 		bad "FreeSync, 144 Hz" "couldn't change $CMD"
 	fi
 else
-	skip "FreeSync, 144 Hz" "left off"
+	skip "FreeSync, 144 Hz" "aborted (stays off)"
 fi
 
 # 5. Quiet fan curve (optional)
@@ -260,7 +263,7 @@ elif ask "Install the quieter fan curve? The console runs warmer in games." n; t
 	fan_step() { fetch quiet-fan.sh | sh; }
 	if run Fan fan_step; then ok "Quiet fan curve" "installed"; else bad "Quiet fan curve" "failed"; why Fan; fi
 else
-	skip "Quiet fan curve" "not installed (kernel default)"
+	skip "Quiet fan curve" "aborted (kernel default curve)"
 fi
 
 # 6. Updater icon + daily check
@@ -289,7 +292,7 @@ if ask "Update system packages and apps now? Takes a few minutes." y; then
 		line "$YEL" "!" "Config files" "$(printf '%s\n' "$pacnew" | grep -c .) new .pacnew file(s), listed in the log"; echo
 	fi
 else
-	skip "System packages" "skipped"
+	skip "System packages" "aborted"
 fi
 
 echo
