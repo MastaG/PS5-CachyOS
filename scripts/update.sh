@@ -46,13 +46,25 @@ run() { s=$1; shift; printf '\n===== %s =====\n' "$s" >> "$LOG"; "$@" >> "$LOG" 
 out() { awk -v m="===== $1 =====" '$0 == m { b = ""; on = 1; next } /^===== / { on = 0 } on { b = b $0 "\n" } END { printf "%s", b }' "$LOG"; }
 # the last lines of a failed step, under its line
 why() { out "$1" | grep -v '^[[:space:]]*$' | tail -n 6 | sed "s/^/      $DIM/; s/\$/$OFF/"; }
-# answers come from the keyboard, even when the script itself is piped in
-ask() { # ask "question" default(y|n)
-	d=$2
-	if [ "$d" = y ]; then h="Enter = yes, n = no"; else h="Enter = no, y = yes"; fi
-	printf '%s  %s?%s %s %s[%s]%s ' "$CL" "$YEL" "$OFF" "$1" "$DIM" "$h" "$OFF"
-	read a </dev/tty 2>/dev/null || a=""
-	case "${a:-$d}" in y|Y|yes|Yes) return 0 ;; *) return 1 ;; esac
+# One key from the keyboard (also when this script itself is piped in): enter, esc or the character.
+key() {
+	old=$(stty -g </dev/tty 2>/dev/null) || { echo none; return; }
+	stty -icanon -echo min 1 time 0 </dev/tty
+	k=$(dd bs=1 count=1 </dev/tty 2>/dev/null | od -An -c | tr -d ' ')
+	# arrow keys etc. send more right after Esc: read and drop it, and don't count it as Esc
+	stty min 0 time 1 </dev/tty; more=$(dd bs=16 count=1 </dev/tty 2>/dev/null | od -An -c | tr -d ' ')
+	stty "$old" </dev/tty
+	case "$k" in '\n'|'\r') echo enter ;; 033) [ -z "$more" ] && echo esc || echo other ;; *) echo "$k" ;; esac
+}
+ask() { # ask "question" default(y|n, used only without a keyboard)
+	printf '%s  %s?%s %s %s[Enter = continue, Esc = abort]%s ' "$CL" "$YEL" "$OFF" "$1" "$DIM" "$OFF"
+	while :; do
+		case $(key) in
+		enter|y|Y) echo continue; return 0 ;;
+		esc|n|N) echo aborted; return 1 ;;
+		none) [ "$2" = y ] && { echo yes; return 0; }; echo no; return 1 ;;
+		esac
+	done
 }
 fetch() { curl -fsSL "$R/$1" || die "couldn't download $1 (are you online?)"; }
 
@@ -66,7 +78,10 @@ install_updater() {
 # Runs the newest PS5 CachyOS updater from GitHub.
 curl -fsSL $R/update.sh | sh
 echo
-printf "\nPress Enter to close"; read _
+printf "\nPress any key to close"
+old=\$(stty -g </dev/tty 2>/dev/null) && stty -icanon -echo min 1 time 0 </dev/tty
+dd bs=1 count=1 </dev/tty >/dev/null 2>&1
+[ -n "\$old" ] && stty "\$old" </dev/tty
 PS5EOF
 	cat > "$UBIN/ps5-update-check" <<'PS5EOF'
 #!/bin/sh
