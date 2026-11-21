@@ -56,7 +56,7 @@ Everything upstream's image has is still in this one (Gaming Mode, HDR, FreeSync
 | **Emulators** | | the [bc250-emulators](https://github.com/MastaG/bc250-emulators) repo is set up (nothing installed): KytyPS5-Native, Lichii, with Steam shortcuts in collections |
 | **Proton** | | the [FSR 4 Proton builds](docs/PROTON.md) are available from `[bc250-cachyos]` |
 | **Boost** | an `install.sh` extra | `sudo ps5-boost on` / `off`, off by default |
-| **Fan** | quiet curve | a smoother curve (no silent-to-loud jumps) |
+| **Fan** | quiet curve | a smoother curve: upstream's is so quiet up to 65 °C (PWM 5-31) that under load the fan jumps from nearly silent to loud every few seconds; this one starts higher (PWM 40 at 50 °C) and rises evenly |
 | **Internal M.2** | | `sudo ps5-install-m2` |
 | **Loader** | soniciso1's releases | the same loader built from his main branch with [PR #31](https://github.com/soniciso1/ps5-linux-loader/pull/31) (PS5 Pro pairing export), until he releases it ([the loader](#the-loader)) |
 | **Other** | | NTP clock sync on, `steam` in the `render` group, base-devel and git preinstalled, updates from this fork |
