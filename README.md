@@ -7,7 +7,7 @@
 ![KDE Plasma 6.8](https://img.shields.io/badge/KDE_Plasma-6.8-1d99f3)
 ![Wayland](https://img.shields.io/badge/Wayland-yes-2ea44f)
 
-![KDE "About this System" on the PS5: kernel 7.3.4-p1472, KDE Plasma 6.8.2 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 13.7 GiB RAM](images/about-this-system-p1472.png)
+![KDE "About this System" on the PS5: kernel 7.3.5-pc8fe, KDE Plasma 6.8.3 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 13.7 GiB RAM](images/about-this-system-pc8fe.png)
 
 **Tested on** a PS5 launch model Digital Edition (CFI-1016B), firmware 13.60, [soniciso1's ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases), a 1 TB USB-C SSD, a 1440p 144 Hz monitor and a 4K 60 Hz TV. The image is built on the official [ps5-linux CachyOS image](https://github.com/ps5-linux/ps5-linux-image), see [Credits](#credits).
 
@@ -109,7 +109,7 @@ On an older install without that icon, run this once on the desktop as your norm
 curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update.sh | sh
 ```
 
-![The updater on the desktop: the "Update PS5 CachyOS" icon among the desktop icons](images/updater-p1472.jpg)
+![The PS5 CachyOS Updater: console info at the top, one line per step, all done in 1 min 21 s](images/updater-pc8fe.png)
 
 It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam extras**, **FreeSync and 1080p 144 Hz** (asks), the **quiet fan curve** (asks, default no), the **update icon** with a daily check for new kernels, and finally **all system packages and Flatpak apps** (asks). Restart afterwards if the kernel changed.
 
@@ -240,6 +240,10 @@ Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 sec
 
 - **[soniciso1/ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases)**: Linux loader with 13.60 support
 - **[ps5-linux](https://github.com/ps5-linux)**: [image](https://github.com/ps5-linux/ps5-linux-image) this guide's image is built on, [kernel patches](https://github.com/ps5-linux/ps5-linux-patches), [Wi-Fi driver](https://github.com/ps5-linux/ps5-linux-mwifiex), [tools](https://github.com/ps5-linux/ps5-linux-tools)
+- **[QuartConz/ps5-pro-viola-bluetooth](https://github.com/QuartConz/ps5-pro-viola-bluetooth)** and **[WizGery/ps5-mediatek-fixes](https://github.com/WizGery/ps5-mediatek-fixes)**: PS5 Pro Bluetooth driver work
+- **[MastaG](https://github.com/MastaG)**: PS5 Pro Bluetooth port and testing ([#7](https://github.com/abrocoma/PS5-CachyOS/pull/7)), faster DualSense reconnects, the loader merge with pairing export ([soniciso1 #31](https://github.com/soniciso1/ps5-linux-loader/pull/31))
+- **Slip-Up**: pairing export in the loader ([ps5-linux-loader #97](https://github.com/ps5-linux/ps5-linux-loader/pull/97))
+- **kadhtobi** and everyone who tested and reported issues, especially on the PS5 Pro and Slim
 
 This repo only collects the fixes I needed on top.
 
