@@ -123,6 +123,11 @@ install_updater() {
 	cat > "$UBIN/ps5-update" <<PS5EOF
 #!/bin/sh
 # Runs the newest PS5 CachyOS updater from GitHub.
+# The icon opens this Konsole window with its own state folder, so it doesn't reuse the size of
+# your other Konsole windows: forget its last size (it always opens at the icon's 104 x 32),
+# and don't pass that folder on to the update itself.
+rm -f "\$HOME/.local/state/ps5-update/konsolestaterc"
+unset XDG_STATE_HOME
 curl -fsSL "$R/update.sh?t=\$(date +%s)" | sh
 echo
 printf "\nPress any key to close"
@@ -163,7 +168,7 @@ PS5EOF
 Type=Application
 Name=Update PS5 CachyOS
 Comment=Install the newest PS5 kernel, fixes, extras and system updates
-Exec=konsole --hide-menubar --hide-tabbar -p "LocalTabTitleFormat=PS5 CachyOS Updater" -e $UBIN/ps5-update
+Exec=env XDG_STATE_HOME=$HOME/.local/state/ps5-update konsole --hide-menubar --hide-tabbar -p TerminalColumns=104 -p TerminalRows=32 -p "LocalTabTitleFormat=PS5 CachyOS Updater" -e $UBIN/ps5-update
 Icon=$HOME/.local/share/icons/ps5-update-circle.svg
 Terminal=false
 Categories=System;
