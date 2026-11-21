@@ -1,8 +1,8 @@
 #!/bin/sh
 # PS5 CachyOS: add the newest Gaming Mode / Steam extras to an existing install (no reflash).
 #
-# Install:   curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh
-# Undo:      curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh -s -- --rollback
+# Install:   curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh
+# Undo:      curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh -s -- --rollback
 #
 # Adds:
 #   - Gaming Mode launcher without -steamdeck (Steam no longer "updates" on every switch between
@@ -33,13 +33,16 @@ SHA_1114=f2ad02a6769246150b99bb62bef6d2d2b4fde25b55b7ab8b4827606d3edb0f19   # 20
 SHA_MANGO=048a1c7d106f674ea48c826831e23f64e8a03e325568fff405b7d2c16dd8f50b  # 2026-11-18 live test (unconditional --mangoapp)
 SHA_1119=49d2fce011746602c4669624afa078748cb7da07d83fd83a52adee4555b616b5   # 2026-11-19: no -steamdeck + mangoapp overlay
 SHA_NEW=e0f8569765df67f4490fe28d3ca99d1b41d8054762909b1c3a991e131e7ad9b4    # + refresh rate in Steam, HDR (FLAVA3), WSI
+SHA_NEW_UNIT=13d0ecbb2ccd1cf340d431176394531e4b75409ce578f430792e14ada8e16d38  # SHA_NEW, Steam as a user unit (ps5-steam-session)
+STEAM_LINE='    /usr/bin/steam -gamepadui -steamos3 -steampal'
+UNIT_LINE='    /usr/local/bin/ps5-steam-session'
 SRGB_LUA_NAME=ps5-display.lua   # gamescope sRGB override in ~/.config/gamescope/scripts (needed on VERDE)
 MENU=/usr/local/bin/ps5-gaming-mode-refresh
 BIT12=/usr/local/bin/ps5-12bit-colour
 SYS_STEAM=/usr/share/applications/steam.desktop
 SHADER_LINE="unShaderBackgroundProcessingThreads 16"   # PS5: 8 cores / 16 threads on every model
-URL=https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh
-FILES=https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/files
+URL=https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-extras.sh
+FILES=https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/files
 BTCONF=/etc/bluetooth/main.conf
 VIOLA_FILES="etc/udev/rules.d/50-viola-bt-power.rules etc/modprobe.d/viola-btusb.conf
  usr/local/sbin/ps5-viola-bt-reset etc/systemd/system/ps5-viola-bt-reset.service
@@ -184,7 +187,8 @@ fi
 sha=$(sha256sum "$LAUNCHER" | cut -d' ' -f1)
 replace=no
 case "$sha" in
-	"$SHA_NEW") echo "Gaming Mode launcher is already the newest one." ;;
+	"$SHA_NEW_UNIT") echo "Gaming Mode launcher is already the newest one." ;;
+	"$SHA_NEW") [ -x /usr/local/bin/ps5-steam-session ] && replace=yes || echo "Gaming Mode launcher is already the newest one." ;;
 	"$SHA_1110"|"$SHA_1114"|"$SHA_MANGO"|"$SHA_1119") replace=yes ;;
 	*)
 		if [ "${1:-}" = "--force" ]; then
@@ -288,6 +292,12 @@ exec /usr/bin/steamos-session-select plasma
 PS5EOF
 	[ "$(sha256sum "$LAUNCHER.new" | cut -d' ' -f1)" = "$SHA_NEW" ] ||
 		{ rm -f "$LAUNCHER.new"; die "the new launcher came out wrong (download cut off?). Nothing changed."; }
+	# This fork: Steam runs as steam-launcher.service (ps5-steam-session), so KytyPS5 can unload it.
+	if [ -x /usr/local/bin/ps5-steam-session ]; then
+		sed -i "s|^$STEAM_LINE\$|$UNIT_LINE|" "$LAUNCHER.new"
+		[ "$(sha256sum "$LAUNCHER.new" | cut -d' ' -f1)" = "$SHA_NEW_UNIT" ] ||
+			{ rm -f "$LAUNCHER.new"; die "the Steam unit change didn't apply to the new launcher. Nothing changed."; }
+	fi
 	chmod 755 "$LAUNCHER.new"
 	mv "$LAUNCHER.new" "$LAUNCHER"
 	echo "Gaming Mode: refresh rate in Steam's display settings, performance overlay, no Steam update loop."

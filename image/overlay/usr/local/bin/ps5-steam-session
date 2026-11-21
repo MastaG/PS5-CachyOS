@@ -1,0 +1,36 @@
+#!/bin/bash
+# gamescope's child in the PS5 gamescope session (gamescope-session-ps5): runs Steam as
+# steam-launcher.service and lives as long as Steam does. While a game has unloaded Steam
+# (kytyps5-run masks and stops the unit), it waits for Steam to come back instead of ending
+# the session. When Steam quits by itself, this ends, and with it gamescope.
+rt=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+unit=steam-launcher.service
+# Everything gamescope passes to its child (DISPLAY, GAMESCOPE_WAYLAND_DISPLAY, the STEAM_*
+# switches of gamescope-session-ps5), quoted for the unit's bash.
+export -p > "$rt/ps5-steam-environment"
+# Where kytyps5-run (and SteamOS tools) look for gamescope's Wayland socket.
+printf 'DISPLAY=%s\nGAMESCOPE_WAYLAND_DISPLAY=%s\n' "${DISPLAY:-}" "${GAMESCOPE_WAYLAND_DISPLAY:-}" \
+    > "$rt/gamescope-environment"
+
+trap 'systemctl --user stop --no-block "$unit"' EXIT
+systemctl --user unmask --runtime "$unit" 2>/dev/null
+systemctl --user reset-failed "$unit" 2>/dev/null
+systemctl --user start "$unit" || exit 1
+
+steam_up() {
+    case $(systemctl --user is-active "$unit" 2>/dev/null) in
+    active | activating | deactivating | reloading) return 0 ;;
+    esac
+    # Unloaded by a game: kytyps5-run masks the unit until it brings Steam back, and the game
+    # runs in a kytyps5-<title id> unit of its own.
+    [ "$(systemctl --user is-enabled "$unit" 2>/dev/null)" = masked-runtime ] && return 0
+    systemctl --user list-units --state=active,activating --no-legend 'kytyps5-*.service' 2>/dev/null | grep -q .
+}
+while :; do
+    sleep 2
+    steam_up && continue
+    # Between "unmask" and "start" when a game brings Steam back: look once more.
+    sleep 3
+    steam_up || break
+done
+trap - EXIT

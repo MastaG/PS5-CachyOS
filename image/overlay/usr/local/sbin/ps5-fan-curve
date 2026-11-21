@@ -1,0 +1,26 @@
+#!/bin/sh
+# Smooth fan curve for the ps5-fan hwmon driver (ps5-linux-patches #60+): rises gradually, no silent-to-loud jumps;
+# keeps the SoC around 73 C in games with boost on.
+# Kernel default: 50/60/65/70/75/80/85/87 C -> pwm 26/77/102/128/166/204/242/255.
+# The last point must stay 255; the driver forces full speed at 90 C regardless.
+TEMPS="50 55 60 65 70 75 80 88"
+PWMS="40 50 60 72 85 100 125 255"
+for h in /sys/class/hwmon/hwmon*; do
+	[ "$(cat $h/name 2>/dev/null)" = ps5_fan ] && H=$h
+done
+[ -n "$H" ] || { echo "no ps5_fan hwmon (old kernel?), nothing to do"; exit 0; }
+# Points must stay ordered after every single write, so retry a few passes.
+# Write both ways each pass: a raised curve needs high points first, a lowered one low points first.
+for pass in 1 2 3 4 5 6 7 8; do
+	i=8; for t in $(echo $TEMPS | tr ' ' '\n' | tac); do
+		echo $((t * 1000)) > $H/pwm1_auto_point${i}_temp 2>/dev/null; i=$((i - 1)); done
+	i=1; for t in $TEMPS; do
+		echo $((t * 1000)) > $H/pwm1_auto_point${i}_temp 2>/dev/null; i=$((i + 1)); done
+	i=8; for p in $(echo $PWMS | tr ' ' '\n' | tac); do
+		echo $p > $H/pwm1_auto_point${i}_pwm 2>/dev/null; i=$((i - 1)); done
+	i=1; for p in $PWMS; do
+		echo $p > $H/pwm1_auto_point${i}_pwm 2>/dev/null; i=$((i + 1)); done
+done
+i=1; while [ $i -le 8 ]; do
+	printf '%sC=%s ' $(( $(cat $H/pwm1_auto_point${i}_temp) / 1000 )) $(cat $H/pwm1_auto_point${i}_pwm); i=$((i + 1))
+done; echo

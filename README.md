@@ -1,5 +1,12 @@
 # CachyOS on PS5
 
+> [!NOTE]
+> **This is MastaG's fork of [abrocoma/PS5-CachyOS](https://github.com/abrocoma/PS5-CachyOS).** Its image is
+> upstream's image on **btrfs** (CachyOS subvolume layout, snapper), with the GFX1013 compute kernel
+> `7.3.5-pc8fe-bc1`, the BC-250 Mesa, swap file + zswap, a smoother fan curve, boost as an opt-in, the
+> emulator repo (nothing installed) and an installer for the internal M.2. Details: [image/README.md](image/README.md).
+> Everything else in this guide is upstream's and applies as written.
+
 **Run a full Linux desktop and Steam on a jailbroken PS5.** Flash a ready-made image to a USB SSD, boot it, play.
 
 ![Firmware 13.60](https://img.shields.io/badge/PS5_firmware-13.60-0070d1)

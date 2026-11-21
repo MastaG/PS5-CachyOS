@@ -1,0 +1,33 @@
+From b1c96fc17d1799a9a39139b1226d63f100dc7d31 Mon Sep 17 00:00:00 2001
+From: MastaG <mastag@gmail.com>
+Date: Sat, 21 Nov 2026 01:44:50 +0100
+Subject: [PATCH 09/16] drm/amdgpu: guard NULL pages in
+ amdgpu_ttm_tt_unpopulate
+
+Partial TTM population can leave NULL entries in the page vector; skip
+them instead of dereferencing them on unpopulate.
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+index 364be96c0..c103ab449 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+@@ -1289,8 +1289,11 @@ static void amdgpu_ttm_tt_unpopulate(struct ttm_device *bdev,
+ 	if (ttm->page_flags & TTM_TT_FLAG_EXTERNAL)
+ 		return;
+ 
+-	for (i = 0; i < ttm->num_pages; ++i)
+-		ttm->pages[i]->mapping = NULL;
++	/* Partial TTM population can leave NULL entries in the page vector. */
++	for (i = 0; i < ttm->num_pages; ++i) {
++		if (ttm->pages[i])
++			ttm->pages[i]->mapping = NULL;
++	}
+ 
+ 	adev = amdgpu_ttm_adev(bdev);
+ 
+-- 
+2.56.0
+

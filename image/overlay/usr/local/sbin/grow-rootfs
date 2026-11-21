@@ -1,0 +1,16 @@
+#!/bin/bash
+# Grows the root partition and its btrfs to fill the USB SSD. Runs once on first boot, then
+# disables itself. Never on the internal M.2: its partition must end where m2_init put it.
+set -e
+ROOT_DEV=$(findmnt -no SOURCE / | sed 's/\[.*//')
+DISK="/dev/$(lsblk -ndo PKNAME "$ROOT_DEV")"
+PART_NUM=$(cat "/sys/class/block/$(basename "$ROOT_DEV")/partition")
+case "$DISK" in
+/dev/nvme*) echo "root is on $DISK (internal M.2): not growing" ;;
+*)
+	growpart "$DISK" "$PART_NUM" || true
+	partprobe "$DISK" || true
+	btrfs filesystem resize max / || true
+	;;
+esac
+systemctl disable grow-rootfs.service

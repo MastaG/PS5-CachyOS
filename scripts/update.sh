@@ -1,8 +1,8 @@
 #!/bin/sh
 # PS5 CachyOS: bring an existing install up to the newest release, no reflash.
 #
-# Update:   curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update.sh | sh
-# Undo:     curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update.sh | sh -s -- --rollback
+# Update:   curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update.sh | sh
+# Undo:     curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update.sh | sh -s -- --rollback
 #
 # Run it as your normal user, NOT with sudo (it asks for the password itself).
 # It runs, in order:
@@ -19,7 +19,7 @@
 # Steps 1-6 keep backups, so --rollback undoes them (package updates in step 7 can't be undone).
 set -u
 
-R=https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts
+R=https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts
 BOOT=${PS5_BOOT:-/boot/efi}
 CMD="$BOOT/cmdline.txt"
 OPTS="hdmi.vrr=1 hdmi.extended_tmds=1"
@@ -50,7 +50,7 @@ PS5EOF
 #!/bin/sh
 # Shows a notification when the repo's PS5 kernel differs from the running one (once per version).
 # No version ordering: kernel names end in a commit hash (sort -V ranks pb33e above p1472).
-new=$(curl -fsSL --max-time 30 https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sed -n 's/^KVER=//p' | head -1)
+new=$(curl -fsSL --max-time 30 https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sed -n 's/^KVER=//p' | head -1)
 cur=$(uname -r)
 [ -n "$new" ] && [ "$new" != "$cur" ] || exit 0
 seen="$HOME/.cache/ps5-update-notified"

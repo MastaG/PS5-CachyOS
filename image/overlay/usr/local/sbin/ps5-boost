@@ -1,0 +1,41 @@
+#!/bin/sh
+# Boost mode (CPU up to 3.5 GHz, GPU up to 2.23 GHz on the Pro). Off by default.
+#   sudo ps5-boost on       builds ps5_control from ps5-linux-tools (first time only), turns boost on, keeps it on after a reboot
+#   sudo ps5-boost off      turns boost off and keeps it off
+#   ps5-boost status
+# The kernel's fan curve (ps5-fan-curve.service) stays in charge; ps5-linux-tools' ps5fan service is not used.
+set -eu
+BIN=/usr/local/sbin/ps5_control
+TOOLS=https://github.com/ps5-linux/ps5-linux-tools
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+status() {
+	printf 'boost service: %s (%s)\n' "$(systemctl is-active ps5boost.service 2>/dev/null || true)" \
+		"$(systemctl is-enabled ps5boost.service 2>/dev/null || true)"
+	awk -F': ' '/^cpu MHz/ { if ($2 > max) max = $2 } END { if (max) printf "fastest CPU core now: %d MHz\n", max }' /proc/cpuinfo
+}
+
+case "${1:-status}" in
+status) status; exit 0 ;;
+on | off) ;;
+*) echo "usage: ps5-boost on|off|status"; exit 2 ;;
+esac
+[ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+
+if [ "$1" = on ]; then
+	if [ ! -x "$BIN" ]; then
+		for c in git cc make; do command -v "$c" >/dev/null || die "$c is missing (sudo pacman -S --needed git base-devel)"; done
+		t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+		echo "Building ps5_control from $TOOLS ..."
+		git clone -q --depth 1 "$TOOLS" "$t/tools" || die "could not download ps5-linux-tools (no internet?)"
+		cc -O2 -o "$t/ps5_control" "$t/tools/ps5_control.c" || die "building ps5_control failed"
+		install -m755 "$t/ps5_control" "$BIN"
+	fi
+	systemctl enable --now ps5boost.service
+	echo "Boost is on, also after a reboot."
+else
+	systemctl disable --now ps5boost.service 2>/dev/null || true
+	[ -x "$BIN" ] && [ -e /dev/mp1 ] && "$BIN" --boost off || true
+	echo "Boost is off."
+fi
+status

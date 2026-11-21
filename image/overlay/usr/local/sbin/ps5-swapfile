@@ -1,0 +1,24 @@
+#!/bin/bash
+# First boot: a swap file in its own subvolume (var/swap, like board1), zswap compresses in front
+# of it (cmdline.txt). 32 GB on a disk of 128 GB or more; on smaller disks 8 GB with 16 GB free, 4 GB with
+# 8 GB free, else none.
+set -eu
+DONE=/etc/ps5-swapfile-done
+F=/var/swap/swapfile
+size=$(btrfs filesystem usage -b / | awk '/Device size:/ { print $3; exit }')
+free=$(btrfs filesystem usage -b / | awk '/Free \(estimated\):/ { print $3; exit }')
+G=$((1024 * 1024 * 1024))
+if [ "$size" -ge $((128 * G)) ]; then want=32
+elif [ "$free" -ge $((16 * G)) ]; then want=8
+elif [ "$free" -ge $((8 * G)) ]; then want=4
+else want=0; fi
+if [ "$want" -gt 0 ] && [ ! -e "$F" ]; then
+	btrfs subvolume show /var/swap >/dev/null 2>&1 || { rmdir /var/swap 2>/dev/null || true; btrfs subvolume create /var/swap; }
+	btrfs filesystem mkswapfile --size "${want}g" "$F"
+	grep -q "^$F " /etc/fstab || echo "$F none swap defaults,nofail 0 0" >> /etc/fstab
+	swapon "$F"
+	echo "swap file: ${want} GB"
+else
+	echo "swap file: none (disk too small or already there)"
+fi
+touch "$DONE"

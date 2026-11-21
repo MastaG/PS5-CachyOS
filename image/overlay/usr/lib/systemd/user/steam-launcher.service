@@ -1,0 +1,10 @@
+# Steam of the PS5 gamescope session, in a unit of its own (as gamescope-session-plus on SteamOS
+# does), so a game can unload Steam and bring it back: kytyps5-run stops this unit while a big PS5
+# game runs and starts it again on exit. ps5-steam-session (gamescope's child) starts it and saves
+# the environment Steam needs, which a user unit doesn't inherit.
+[Unit]
+Description=Steam (PS5 gamescope session)
+
+[Service]
+ExecStart=/bin/bash -c 'source "%t/ps5-steam-environment" && exec /usr/bin/steam -gamepadui -steamos3 -steampal'
+TimeoutStopSec=30

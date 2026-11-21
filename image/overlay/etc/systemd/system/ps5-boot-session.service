@@ -1,0 +1,14 @@
+[Unit]
+Description=PS5: start the session from ps5-boot-session on every boot
+DefaultDependencies=no
+After=local-fs.target
+RequiresMountsFor=/home/steam
+Before=getty@tty1.service
+ConditionPathExists=/home/steam/.config/ps5-boot-session
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'cp "/home/steam/.config/ps5-boot-session" "/home/steam/.config/ps5-next-session" && chown "steam:" "/home/steam/.config/ps5-next-session"'
+
+[Install]
+WantedBy=multi-user.target

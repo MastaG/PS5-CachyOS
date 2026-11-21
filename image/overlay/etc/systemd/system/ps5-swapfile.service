@@ -1,0 +1,11 @@
+[Unit]
+Description=PS5: create the swap file on first boot
+After=grow-rootfs.service local-fs.target
+ConditionPathExists=!/etc/ps5-swapfile-done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ps5-swapfile
+
+[Install]
+WantedBy=multi-user.target

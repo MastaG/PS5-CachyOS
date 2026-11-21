@@ -1,8 +1,8 @@
 #!/bin/sh
 # PS5 CachyOS: quieter fan curve + "SoC Temp" reading in the KDE panel.
 #
-# Install:  curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/quiet-fan.sh | sh
-# Remove:   curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/quiet-fan.sh | sh -s -- --remove
+# Install:  curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/quiet-fan.sh | sh
+# Remove:   curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/quiet-fan.sh | sh -s -- --remove
 #
 # Run it as your normal user (NOT with sudo). It asks for your password itself
 # for the fan part; the panel widget has to be added as you.
@@ -56,22 +56,28 @@ if ! grep -qx ps5_fan /sys/class/hwmon/hwmon*/name 2>/dev/null; then
 	exit 1
 fi
 
-echo "Installing the quiet fan curve (password needed)..."
+echo "Installing the fan curve (password needed)..."
 sudo tee "$SCRIPT" >/dev/null <<'EOF'
 #!/bin/sh
-# Quieter curve for the ps5-fan hwmon driver (ps5-linux-patches #60+).
+# Smooth fan curve for the ps5-fan hwmon driver (ps5-linux-patches #60+): rises gradually, no silent-to-loud jumps;
+# keeps the SoC around 73 C in games with boost on.
 # Kernel default: 50/60/65/70/75/80/85/87 C -> pwm 26/77/102/128/166/204/242/255.
 # The last point must stay 255; the driver forces full speed at 90 C regardless.
-TEMPS="55 60 65 70 75 80 85 88"
-PWMS="5 16 31 48 67 120 190 255"
+TEMPS="50 55 60 65 70 75 80 88"
+PWMS="40 50 60 72 85 100 125 255"
 for h in /sys/class/hwmon/hwmon*; do
 	[ "$(cat $h/name 2>/dev/null)" = ps5_fan ] && H=$h
 done
 [ -n "$H" ] || { echo "no ps5_fan hwmon (old kernel?), nothing to do"; exit 0; }
 # Points must stay ordered after every single write, so retry a few passes.
-for pass in 1 2 3 4; do
+# Write both ways each pass: a raised curve needs high points first, a lowered one low points first.
+for pass in 1 2 3 4 5 6 7 8; do
 	i=8; for t in $(echo $TEMPS | tr ' ' '\n' | tac); do
 		echo $((t * 1000)) > $H/pwm1_auto_point${i}_temp 2>/dev/null; i=$((i - 1)); done
+	i=1; for t in $TEMPS; do
+		echo $((t * 1000)) > $H/pwm1_auto_point${i}_temp 2>/dev/null; i=$((i + 1)); done
+	i=8; for p in $(echo $PWMS | tr ' ' '\n' | tac); do
+		echo $p > $H/pwm1_auto_point${i}_pwm 2>/dev/null; i=$((i - 1)); done
 	i=1; for p in $PWMS; do
 		echo $p > $H/pwm1_auto_point${i}_pwm 2>/dev/null; i=$((i + 1)); done
 done

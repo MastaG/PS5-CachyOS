@@ -1,8 +1,8 @@
 #!/bin/sh
 # PS5 CachyOS: install the newest kernel from the PS5-CachyOS repo (kernel/) without reflashing.
 #
-# Update:    curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh
-# Roll back: curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --rollback
+# Update:    curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh
+# Roll back: curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --rollback
 #
 # Installs the kernel (bzImage), its modules (incl. the Wi-Fi driver) and builds a
 # new initrd. The current kernel + initrd are kept as bzImage.bak / initrd.img.bak
@@ -11,9 +11,9 @@
 # and cmdline.txt are not touched.
 set -eu
 
-KVER=7.3.5-pc8fe
+KVER=7.3.5-pc8fe-bc1
 PKG=ps5-kernel-$KVER.tar.zst
-URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/kernel}
+URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/kernel}
 BOOT=${PS5_BOOT:-/boot/efi}
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -58,7 +58,7 @@ done
 # Replace the old zz-update-boot hook with the safe one (see scripts/files/zz-update-boot).
 # Only on installs that have the hook; the old one is kept outside postinst.d.
 HOOK=/etc/kernel/postinst.d/zz-update-boot
-FILES=${PS5_FILES_URL:-https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/files}
+FILES=${PS5_FILES_URL:-https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/files}
 if [ -f "$HOOK" ] && ! grep -q 'Safe by design' "$HOOK"; then
 	if curl -fsSL --max-time 30 -o "$HOOK.new" "$FILES/zz-update-boot" && grep -q 'Safe by design' "$HOOK.new"; then
 		cp "$HOOK" /etc/kernel/zz-update-boot.bak
@@ -178,7 +178,7 @@ echo
 echo "Done: kernel $KVER installed. Restart the PS5 and boot Linux as usual."
 echo "After the restart, 'uname -r' should say $KVER."
 echo "If anything is wrong, roll back with:"
-echo "  curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --rollback"
+echo "  curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --rollback"
 if ! grep -q 'hdmi.vrr=1' "$BOOT/cmdline.txt"; then
 	echo
 	echo "Tip: for FreeSync and 1080p 144 Hz, add ' hdmi.vrr=1 hdmi.extended_tmds=1' to the end of"

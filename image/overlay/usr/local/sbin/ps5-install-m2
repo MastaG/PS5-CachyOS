@@ -1,0 +1,102 @@
+#!/bin/bash
+# Copies this system (the USB SSD you booted) to the PS5's internal M.2 SSD, with the same btrfs
+# layout (@ @home @root @srv @cache @log @tmp, .snapshots, var/swap). The USB SSD keeps the boot
+# partition: the loader still reads bzImage, initrd.img and cmdline.txt from it, and cmdline.txt
+# is switched to the M.2 root (the old one is kept as cmdline.txt.usb-root).
+#
+#   sudo ps5-install-m2              asks before it erases anything
+#   sudo ps5-install-m2 --usb-root   points cmdline.txt back at the USB root
+#
+# THE WHOLE M.2 IS ERASED, including PS5 games stored on it. m2_init (ps5-linux-tools) writes the
+# partition table at the offset PS5 OS expects, so PS5 OS keeps booting with the M.2 installed.
+set -euo pipefail
+
+NVME=/dev/nvme0n1
+PART=${NVME}p1
+LABEL=cachyos-m2
+BOOT=/boot/efi
+TOOLS=https://github.com/ps5-linux/ps5-linux-tools
+MNT=/mnt/ps5-m2
+OPTS=noatime,compress=zstd
+SUBVOLS="@ @home @root @srv @cache @log @tmp"
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+[ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+
+if [ "${1:-}" = --usb-root ]; then
+	[ -s "$BOOT/cmdline.txt.usb-root" ] || die "no $BOOT/cmdline.txt.usb-root"
+	cp "$BOOT/cmdline.txt.usb-root" "$BOOT/cmdline.txt"; sync
+	echo "cmdline.txt points at the USB root again. Restart to boot from USB."
+	exit 0
+fi
+
+root_src=$(findmnt -no SOURCE / | sed 's/\[.*//')
+root_disk=$(lsblk -no PKNAME "$root_src")
+[ "$(findmnt -no FSTYPE /)" = btrfs ] || die "/ is not btrfs. Run this from the btrfs USB image."
+[ "/dev/$root_disk" != "$NVME" ] || die "this system already runs from the M.2."
+[ -b "$NVME" ] || die "no M.2 SSD found ($NVME)."
+findmnt -no SOURCE "$BOOT" >/dev/null || die "$BOOT is not mounted."
+[ "$(lsblk -no PKNAME "$(findmnt -no SOURCE "$BOOT")")" = "$root_disk" ] ||
+	die "$BOOT is not on the USB SSD this system runs from."
+if lsblk -lno MOUNTPOINTS "$NVME" | grep -q .; then die "something on $NVME is mounted. Unmount it first."; fi
+grep -qw "LABEL=$LABEL" /proc/cmdline && die "the kernel already uses LABEL=$LABEL as root."
+for c in git cc rsync mkfs.btrfs btrfs partprobe; do command -v "$c" >/dev/null || die "$c is missing (sudo pacman -S --needed git base-devel rsync btrfs-progs parted)"; done
+
+size=$(lsblk -bndo SIZE "$NVME"); used=$(btrfs filesystem usage -b / 2>/dev/null | awk '/Used:/ { print $2; exit }')
+printf 'M.2:    %s  %s, %d GB\n' "$NVME" "$(lsblk -ndo MODEL "$NVME" | sed 's/ *$//')" $((size / 1000000000))
+printf 'Copy:   %d GB from %s (compressed size on disk)\n' $((used / 1000000000)) "/dev/$root_disk"
+lsblk -o NAME,SIZE,FSTYPE,LABEL "$NVME" | sed 's/^/        /'
+echo
+echo "This ERASES THE WHOLE M.2, including PS5 games stored on it."
+read -r -p "Type ERASE to continue: " ok
+[ "$ok" = ERASE ] || die "nothing changed."
+
+work=$(mktemp -d); trap 'umount -R "$MNT" 2>/dev/null || true; rm -rf "$work"' EXIT
+echo "== Building m2_init from $TOOLS"
+git clone -q --depth 1 "$TOOLS" "$work/tools" || die "could not download ps5-linux-tools (no internet?)"
+cc -Os -o "$work/m2_init" "$work/tools/m2_init.c" -lz || die "building m2_init failed"
+
+echo "== Partitioning the M.2 (m2_init)"
+wipefs -aq "$NVME"
+"$work/m2_init"
+partprobe "$NVME" || true; udevadm settle
+for _ in $(seq 20); do [ -b "$PART" ] && break; sleep 0.5; done
+[ -b "$PART" ] || die "$PART did not appear after m2_init."
+
+echo "== Creating btrfs (LABEL=$LABEL)"
+mkfs.btrfs -q -f -L "$LABEL" "$PART"
+mkdir -p "$MNT"
+mount -o "$OPTS" "$PART" "$MNT"
+for s in $SUBVOLS; do btrfs -q subvolume create "$MNT/$s"; done
+umount "$MNT"
+mount -o "$OPTS,subvol=@" "$PART" "$MNT"
+for m in home:@home root:@root srv:@srv var/cache:@cache var/log:@log var/tmp:@tmp; do
+	mkdir -p "$MNT/${m%%:*}"; mount -o "$OPTS,subvol=${m##*:}" "$PART" "$MNT/${m%%:*}"
+done
+mkdir -p "$MNT/var"
+btrfs -q subvolume create "$MNT/.snapshots"
+btrfs -q subvolume create "$MNT/var/swap"; chattr +C "$MNT/var/swap"
+
+echo "== Copying (this takes a while)"
+# Every subvolume is a file system of its own, so -x copies one at a time. .snapshots stays empty
+# (snapshots belong to the USB disk), the swap file is made again on the first M.2 boot.
+for d in / /home /root /srv /var/cache /var/log /var/tmp; do
+	rsync -aHAXx --info=progress2 --filter="-x security.selinux" --exclude=/.snapshots/* --exclude=/var/swap/* \
+		--exclude=/boot/efi/* --exclude=/mnt/ps5-m2 "$d/" "$MNT${d%/}/"
+done
+
+echo "== Configuring the M.2 system"
+sed -i -E "s/^LABEL=cachyos([[:space:]])/LABEL=$LABEL\1/; /[[:space:]]swap[[:space:]]/d" "$MNT/etc/fstab"
+rm -f "$MNT/etc/ps5-swapfile-done"
+# grow-rootfs must never run on the M.2: the partition ends before the area PS5 OS needs.
+rm -f "$MNT/etc/systemd/system/local-fs.target.wants/grow-rootfs.service"
+ln -sf /dev/null "$MNT/etc/systemd/system/grow-rootfs.service"
+grep -v '^#' "$MNT/etc/fstab" | grep . | sed 's/^/        /'
+
+[ -s "$BOOT/cmdline.txt.usb-root" ] || cp "$BOOT/cmdline.txt" "$BOOT/cmdline.txt.usb-root"
+sed -E "s/(^| )root=[^ ]*/\1root=LABEL=$LABEL/" "$BOOT/cmdline.txt.usb-root" > "$BOOT/cmdline.txt.new"
+grep -q "root=LABEL=$LABEL" "$BOOT/cmdline.txt.new" || die "could not set root= in cmdline.txt"
+mv "$BOOT/cmdline.txt.new" "$BOOT/cmdline.txt"; sync
+echo
+echo "Done. cmdline.txt now boots the M.2 (root=LABEL=$LABEL); keep the USB SSD plugged in, it has the"
+echo "boot partition. Back to the USB root: sudo ps5-install-m2 --usb-root"
