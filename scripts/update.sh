@@ -199,6 +199,7 @@ printf '%sKernel, fixes, Gaming Mode extras and system packages.%s\n' "$DIM" "$O
 printf '%sYour files and settings stay as they are.%s\n' "$DIM" "$OFF"
 printf '%s%s%s\n\n' "$DIM" "$RULE" "$OFF"
 sudo -v || exit 1
+T0=$(date +%s)
 # keep sudo alive through long steps
 ( while sleep 50; do sudo -n -v 2>/dev/null || exit 0; done ) &
 KEEP=$!
@@ -311,9 +312,9 @@ fi
 
 # Optional extras, only offered while they're not installed
 if ! pacman -Q xone-dkms >/dev/null 2>&1; then
-	printf '%s  %sOptional:%s  x = driver for the Xbox Wireless Adapter (USB dongle)\n\n    %sEnter = done%s' "$CL" "$BLD" "$OFF" "$DIM" "$OFF"
+	printf '%s\n  %sOptional%s   Xbox Wireless Adapter driver (USB dongle for Xbox controllers)\n\n    %sx = install    Enter = done%s' "$CL" "$YEL" "$OFF" "$DIM" "$OFF"
 	k=$(key)
-	if [ -n "$CL" ]; then printf '\r\033[K\033[1A\r\033[K\033[1A\r\033[K'; else echo; fi
+	if [ -n "$CL" ]; then printf '\r\033[K\033[1A\r\033[K\033[1A\r\033[K\033[1A\r\033[K'; else echo; fi
 	case $k in
 	x|X)
 		busy "Xbox adapter" "installing headers and driver (2-5 min)"
@@ -331,14 +332,16 @@ if ! pacman -Q xone-dkms >/dev/null 2>&1; then
 	esac
 fi
 
-echo
+took=$(( $(date +%s) - T0 ))
+if [ $took -ge 60 ]; then took="$((took / 60)) min $((took % 60)) s"; else took="$took s"; fi
+printf '\n%s%s%s\n' "$DIM" "$RULE" "$OFF"
 if [ "$KFAIL" = 1 ]; then
 	printf '%sDone, but the kernel step failed.%s Everything else was updated.\n' "$BLD" "$OFF"
 	echo "Run the updater again later, or open an issue with the log below."
 elif [ "$RESTART" = 1 ]; then
-	printf '%sAll done.%s Restart PS5 Linux to use the new kernel and settings.\n' "$BLD" "$OFF"
+	printf '%s%sAll done.%s Restart PS5 Linux to use the new kernel and settings.\n' "$BLD" "$GRN" "$OFF"
 else
-	printf '%sAll done.%s\n' "$BLD" "$OFF"
+	printf '%s%sAll done.%s Everything is up to date.\n' "$BLD" "$GRN" "$OFF"
 fi
-printf '%sDetails: %s%s\n' "$DIM" "$LOG" "$OFF"
+printf '%sFinished in %s. Details: %s%s\n' "$DIM" "$took" "$LOG" "$OFF"
 { echo; echo "Undo steps 1-6: curl -fsSL $R/update.sh | sh -s -- --rollback"; } >> "$LOG"
