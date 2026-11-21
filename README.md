@@ -248,4 +248,8 @@ Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 sec
 
 This repo only collects the fixes I needed on top.
 
+## License
+
+The scripts, files and docs in this repo are under the [GNU GPL-3.0](LICENSE): you may use, change and share them, and changed versions must stay under the GPL-3.0 with the source available. The kernel patches in `patches/` keep the license of the code they change (the Linux kernel's GPL-2.0), and the software in the image keeps its own licenses.
+
 If this guide helped you, you can [buy me a coffee on Ko-fi](https://ko-fi.com/abrocoma). Thanks!
