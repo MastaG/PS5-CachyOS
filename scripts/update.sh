@@ -71,6 +71,14 @@ header() {
 		"they are."                            "$DIM" "                       " "${DIM}Uptime$OFF   $up"
 	if [ "$cols" -ge 100 ]; then
 		while [ $# -ge 4 ]; do printf '  %s%-34s%s  %s%s%s   %s\n' "$2" "$1" "$OFF" "$BLU" "$3" "$OFF" "$4"; shift 4; done
+	else
+		# not wide enough for three columns: the logo goes on top
+		printf '  %s%s%s\n' "$BLU" "██████  ███████ ███████" "$OFF" "$BLU" "██   ██ ██      ██     " "$OFF" \
+			"$BLU" "██████  ███████ ███████" "$OFF" "$BLU" "██           ██      ██" "$OFF" "$BLU" "██      ███████ ███████" "$OFF"
+		echo
+	fi
+	if [ "$cols" -ge 100 ]; then
+		:
 	elif [ "$cols" -ge 74 ]; then
 		while [ $# -ge 4 ]; do printf '  %s%-34s%s  %s\n' "$2" "$1" "$OFF" "$4"; shift 4; done
 	else
