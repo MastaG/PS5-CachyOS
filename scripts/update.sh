@@ -29,6 +29,7 @@ say() { printf '\n== %s\n' "$*"; }
 
 # One line per step; everything the steps print goes to the log.
 LOG="$HOME/.cache/ps5-update.log"
+RULE='──────────────────────────────────────────────────────────────'
 if [ -t 1 ]; then
 	GRN=$(printf '\033[32m'); RED=$(printf '\033[31m'); YEL=$(printf '\033[33m')
 	BLD=$(printf '\033[1m'); DIM=$(printf '\033[2m'); OFF=$(printf '\033[0m'); CL=$(printf '\r\033[K')
@@ -47,8 +48,9 @@ run() { s=$1; shift; printf '\n===== %s =====\n' "$s" >> "$LOG"; "$@" >> "$LOG" 
 out() { awk -v m="===== $1 =====" '$0 == m { b = ""; on = 1; next } /^===== / { on = 0 } on { b = b $0 "\n" } END { printf "%s", b }' "$LOG"; }
 # the last lines of a failed step, under its line
 why() { out "$1" | grep -v '^[[:space:]]*$' | tail -n 6 | sed "s/^/      $DIM/; s/\$/$OFF/"; }
-# The block at the bottom: PS5 in block letters, and this console's info next to it.
-ps5_info() {
+# The header: title and intro on the left, PS5 logo and this console's info on the right.
+# Narrow windows: no logo; very narrow: the info goes under the title.
+header() {
 	gpu=$(cat /sys/class/drm/card*/device/device 2>/dev/null | head -1)
 	ic=$(journalctl -k -b --no-pager 2>/dev/null | sed -n 's/.*HDMI IC Type \[\([A-Za-z0-9]*\)\].*/\1/p' | head -1)
 	if [ "$gpu" = 0x13da ]; then model="PS5 Pro"; elif [ "$ic" = VERDE ]; then model="PS5 Slim"; elif [ "$ic" = FLAVA3 ]; then model="PS5 Fat"; else model="PS5"; fi
@@ -58,15 +60,26 @@ ps5_info() {
 	mem=$(free -h --si 2>/dev/null | awk '/^Mem:/ { print $3 " / " $2 }')
 	disk=$(df -h --output=used,size / 2>/dev/null | awk 'NR == 2 { print $1 " / " $2 }')
 	up=$(uptime -p 2>/dev/null | sed 's/^up //')
+	cols=$( (stty size </dev/tty) 2>/dev/null | awk '{ print $2 }'); [ -n "$cols" ] || cols=80
+	# left: plain text + its style; right: logo + info
 	set -- \
-		"██████  ███████ ███████" "$BLD$model$OFF" \
-		"██   ██ ██      ██     " "${DIM}Kernel$OFF   $kern" \
-		"██████  ███████ ███████" "${DIM}Desktop$OFF  ${plasma:-KDE Plasma}" \
-		"██           ██      ██" "${DIM}Memory$OFF   $mem" \
-		"██      ███████ ███████" "${DIM}Disk$OFF     $disk" \
-		"                       " "${DIM}Uptime$OFF   $up"
-	echo
-	while [ $# -ge 2 ]; do printf '  %s%s%s    %s\n' "$BLU" "$1" "$OFF" "$2"; shift 2; done
+		"PS5 CachyOS Updater"                  "$BLD" "██████  ███████ ███████" "$BLD$model$OFF" \
+		"github.com/abrocoma/PS5-CachyOS"      "$BLU" "██   ██ ██      ██     " "${DIM}Kernel$OFF   $kern" \
+		""                                     ""     "██████  ███████ ███████" "${DIM}Desktop$OFF  ${plasma:-KDE Plasma}" \
+		"Kernel, fixes, extras, packages."     "$DIM" "██           ██      ██" "${DIM}Memory$OFF   $mem" \
+		"Your files and settings stay as"      "$DIM" "██      ███████ ███████" "${DIM}Disk$OFF     $disk" \
+		"they are."                            "$DIM" "                       " "${DIM}Uptime$OFF   $up"
+	if [ "$cols" -ge 100 ]; then
+		while [ $# -ge 4 ]; do printf '  %s%-34s%s  %s%s%s   %s\n' "$2" "$1" "$OFF" "$BLU" "$3" "$OFF" "$4"; shift 4; done
+	elif [ "$cols" -ge 74 ]; then
+		while [ $# -ge 4 ]; do printf '  %s%-34s%s  %s\n' "$2" "$1" "$OFF" "$4"; shift 4; done
+	else
+		while [ $# -ge 4 ]; do printf '  %s%s%s\n' "$2" "$1" "$OFF"; shift 4; done
+		echo
+		printf '  %s\n' "$BLD$model$OFF" "${DIM}Kernel$OFF   $kern" "${DIM}Desktop$OFF  ${plasma:-KDE Plasma}" "${DIM}Memory$OFF   $mem" "${DIM}Disk$OFF     $disk" "${DIM}Uptime$OFF   $up"
+	fi
+	w=$cols; [ "$w" -gt 100 ] && w=100
+	printf '%s%s%s\n\n' "$DIM" "$(printf '%*s' "$((w - 2))" '' | sed 's/ /─/g' | sed 's/^/  /')" "$OFF"
 }
 # One key from the keyboard (also when this script itself is piped in): enter, esc or the character.
 key() {
@@ -214,12 +227,12 @@ if [ "${1:-}" = "--rollback" ]; then
 fi
 
 [ -t 1 ] && printf '\033[H\033[2J'
-RULE='──────────────────────────────────────────────────────────────'
-printf '%sPS5 CachyOS Updater%s   %sgithub.com/abrocoma/PS5-CachyOS%s\n' "$BLD" "$OFF" "$DIM" "$OFF"
-printf '%s%s%s\n' "$DIM" "$RULE" "$OFF"
-printf '%sKernel, fixes, Gaming Mode extras and system packages.%s\n' "$DIM" "$OFF"
-printf '%sYour files and settings stay as they are.%s\n' "$DIM" "$OFF"
-printf '%s%s%s\n\n' "$DIM" "$RULE" "$OFF"
+# newest kernel version and date from the repo (also shown in the header)
+ks=$(curl -fsSL --max-time 30 "$R/update-kernel.sh" 2>/dev/null)
+new=$(printf '%s\n' "$ks" | sed -n 's/^KVER=//p' | head -1)
+kdate=$(printf '%s\n' "$ks" | sed -n 's/^KDATE="\([^"]*\)".*/\1/p' | head -1)
+kd=${kdate:+, $kdate}   # ", 20 Nov 2026" when the repo says it
+header
 sudo -v || exit 1
 T0=$(date +%s)
 # keep sudo alive through long steps
@@ -233,10 +246,6 @@ RESTART=0
 
 # 1. Kernel
 KFAIL=0
-ks=$(curl -fsSL --max-time 30 "$R/update-kernel.sh" 2>/dev/null)
-new=$(printf '%s\n' "$ks" | sed -n 's/^KVER=//p' | head -1)
-kdate=$(printf '%s\n' "$ks" | sed -n 's/^KDATE="\([^"]*\)".*/\1/p' | head -1)
-kd=${kdate:+, $kdate}   # ", 20 Nov 2026" when the repo says it
 if [ -n "$new" ] && [ "$new" != "$(uname -r)" ]; then busy "Kernel" "installing $new (1-3 min)"; else busy "Kernel" "checking"; fi
 kernel_step() { fetch update-kernel.sh | kernel_sh; }
 if run Kernel kernel_step; then
@@ -369,5 +378,4 @@ else
 	printf '%s%sAll done.%s Everything is up to date.\n' "$BLD" "$GRN" "$OFF"
 fi
 printf '%sFinished in %s. Details: %s%s\n' "$DIM" "$took" "$LOG" "$OFF"
-ps5_info
 { echo; echo "Undo steps 1-6: curl -fsSL $R/update.sh | sh -s -- --rollback"; } >> "$LOG"
