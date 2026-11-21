@@ -120,6 +120,7 @@ It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam
 
 - **Kernel only:** `curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh`. Replaces `/boot/efi/bzImage` + `initrd.img` (old ones kept as `.bak`) and the modules, incl. the Wi-Fi driver. FreeSync and 1080p 144 Hz also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt`. Booting from USB with root on an M.2 drive works too.
 - **Gaming Mode and Steam extras only:** `curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh`. Stops Steam from "updating" on every switch between Gaming Mode and the desktop, adds the performance overlay, makes shader pre-caching use all 16 threads, lets you pick the refresh rate in Steam's own display settings, turns on HDR in Gaming Mode (PS5 Fat), and adds the **12-bit Colour** icon. Changed files are kept as `.bak-extras`; a launcher you edited yourself is left alone (`--force` replaces it).
+- **Kernel headers** (to build extra drivers with DKMS, e.g. `xone` for the Xbox Wireless Adapter): `curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --headers`. Puts the build files at `/usr/lib/modules/<kernel>/build` and builds your DKMS drivers. Later kernel updates install new headers by themselves.
 - **Undo** each one: the same line with `| sudo sh -s -- --rollback` at the end.
 </details>
 
