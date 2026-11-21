@@ -66,7 +66,8 @@ ask() { # ask "question" default(y|n, used only without a keyboard)
 		esac
 	done
 }
-fetch() { curl -fsSL "$R/$1" || die "couldn't download $1 (are you online?)"; }
+# ?t=<time>: skip GitHub's 5-minute cache, so a fix is used right after it's pushed
+fetch() { curl -fsSL "$R/$1?t=$(date +%s)" || die "couldn't download $1 (are you online?)"; }
 
 DESK=$(xdg-user-dir DESKTOP 2>/dev/null || true); [ -n "$DESK" ] && [ "$DESK" != "$HOME" ] || DESK="$HOME/Desktop"
 UBIN="$HOME/.local/bin"; UNIT="$HOME/.config/systemd/user"; APPS="$HOME/.local/share/applications"
@@ -76,7 +77,7 @@ install_updater() {
 	cat > "$UBIN/ps5-update" <<PS5EOF
 #!/bin/sh
 # Runs the newest PS5 CachyOS updater from GitHub.
-curl -fsSL $R/update.sh | sh
+curl -fsSL "$R/update.sh?t=\$(date +%s)" | sh
 echo
 printf "\nPress any key to close"
 old=\$(stty -g </dev/tty 2>/dev/null) && stty -icanon -echo min 1 time 0 </dev/tty
