@@ -1,0 +1,169 @@
+From 4df48b4fc0cb92b53ae1fc5165fc851c4902112f Mon Sep 17 00:00:00 2001
+From: MastaG <mastag@gmail.com>
+Date: Sat, 21 Nov 2026 01:44:49 +0100
+Subject: [PATCH 08/16] drm/amdkfd: BC-250 runlist rebuild to flush the compute
+ TLB
+
+On gfx1013 under HWS the PASID sweep in gmc_v10_0_flush_gpu_tlb_pasid()
+matches no VMID, because mmATC_VMID*_PASID_MAPPING is never written, so
+a compute TLB invalidation never happens. Forcing it via KIQ or direct
+MMIO is never acknowledged. Rebuilding an already-active runlist is the
+invalidation path measured to work on this board.
+
+bc250_flush_by_runlist is a site bitmask (1 = unmap-side, 2 = map-side),
+default 0 (off), applied at the KFD map/unmap ioctls and at the SVM map
+and unmap paths.
+
+This replaces our earlier BC-250 runlist flush, which was a bool
+covering only the unmap ioctl; that one had no capability this lacks.
+
+Based on KytyPS5-Native's bc250-amdgpu patch (faf53a5).
+---
+ drivers/gpu/drm/amd/amdkfd/kfd_chardev.c      |  8 +++
+ .../drm/amd/amdkfd/kfd_device_queue_manager.c | 59 +++++++++++++++++++
+ .../drm/amd/amdkfd/kfd_device_queue_manager.h |  7 +++
+ drivers/gpu/drm/amd/amdkfd/kfd_svm.c          |  5 ++
+ 4 files changed, 79 insertions(+)
+
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+index d65ae53c8..c487649aa 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_chardev.c
+@@ -1426,6 +1426,9 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
+ 		if (WARN_ON_ONCE(!peer_pdd))
+ 			continue;
+ 		kfd_flush_tlb(peer_pdd);
++		/* BC-250: stale invalid translations survive the broken PASID
++		 * sweep and fault on first touch of a fresh mapping (bc250 map-side flush (generic)) */
++		kfd_bc250_flush_by_runlist(peer_pdd->dev, 2);
+ 	}
+ 	kfree(devices_arr);
+ 
+@@ -1513,6 +1516,11 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
+ 			continue;
+ 		if (flush_tlb)
+ 			kfd_flush_tlb(peer_pdd);
++		/* BC-250: rebuild the runlist so the firmware invalidates the
++		 * compute TLB (see kfd_device_queue_manager.c). Called here with
++		 * p->mutex held and dqm_lock free.
++		 */
++		kfd_bc250_flush_by_runlist(peer_pdd->dev, 1); /* bc250 map-side flush (generic) */
+ 
+ 		/* Remove dma mapping after tlb flush to avoid IO_PAGE_FAULT */
+ 		err = amdgpu_amdkfd_gpuvm_dmaunmap_mem(mem, peer_pdd->drm_priv);
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c b/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
+index 7b10ba4d1..02a9a1539 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
+@@ -4099,3 +4099,62 @@ int dqm_debugfs_hang_hws(struct device_queue_manager *dqm)
+ }
+ 
+ #endif
++
++/* BC-250/gfx1013: invalidate the compute TLB by rebuilding the runlist.
++ *
++ * On this board the compute TLB invalidation never happens: the PASID sweep
++ * in gmc_v10_0_flush_gpu_tlb_pasid() depends on mmATC_VMID*_PASID_MAPPING,
++ * which on gfx10 under HWS is never written, so it matches zero VMIDs.
++ * Forcing the invalidation via KIQ or direct MMIO is never acknowledged and
++ * stalls the translation unit. Consequence: hipFree unmaps, hipMalloc reuses
++ * the VA with a new physical address, the PTEs are correct in memory, and the
++ * GPU keeps translating through the previous mapping.
++ *
++ * An invalidation that works does exist: the hardware scheduler's runlist
++ * rebuild (queue preempt + VMID reassign) must invalidate, or a process would
++ * inherit the previous one's translations along with its VMID. This asks for
++ * that cycle on unmap so the stale entry never survives to be used.
++ *
++ * Port of GabriWar/bc250-rocm-working bc250-flush-tlb-by-runlist.patch for
++ * validation on kernel 7.1.5 (their measurement base was 7.0.12).
++ *
++ * Locking: takes dqm_lock. kfd_flush_tlb() must NOT call this --
++ * restore_process_queues_nocpsch() and allocate_vmid()/deallocate_vmid()
++ * already hold dqm_lock; a deadlock there hangs the machine. The only call
++ * site is the unmap ioctl (holds p->mutex, not dqm_lock; same order as
++ * pqm_create_queue).
++ */
++#define BC250_PCI_DEVICE_ID 0x13FE
++
++static int bc250_flush_by_runlist;
++module_param(bc250_flush_by_runlist, int, 0644);
++MODULE_PARM_DESC(bc250_flush_by_runlist,
++	"BC-250: bitmask, rebuild runlist to invalidate TLB: 1=on unmap, 2=on map (default 0)"); /* bc250 map-side flush (generic) */
++
++int kfd_bc250_flush_by_runlist(struct kfd_node *dev, int site)
++{
++	struct device_queue_manager *dqm;
++	int r;
++
++	if (!(bc250_flush_by_runlist & site) || !dev || !dev->adev || !dev->adev->pdev)
++		return 0;
++	if (dev->adev->pdev->device != BC250_PCI_DEVICE_ID)
++		return 0;
++
++	dqm = dev->dqm;
++	/* Only meaningful under hardware scheduling: the firmware reassigns
++	 * VMIDs when the runlist is rebuilt. Without HWS there is no runlist.
++	 */
++	if (!dqm || dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
++		return 0;
++
++	dqm_lock(dqm);
++	r = execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
++				 USE_DEFAULT_GRACE_PERIOD);
++	dqm_unlock(dqm);
++
++	if (r)
++		dev_err_ratelimited(dev->adev->dev,
++			"BC-250: runlist rebuild flush failed (%d)\n", r);
++	return r;
++}
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.h b/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.h
+index c9f9f7a87..5ba39e469 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.h
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.h
+@@ -379,4 +379,11 @@ static inline void update_dqm_wait_times(struct device_queue_manager *dqm)
+ }
+ 
+ 
++
++/* BC-250: rebuild the runlist so the firmware invalidates the compute TLB.
++ * Full documentation in kfd_device_queue_manager.c above
++ * bc250_flush_by_runlist. Takes dqm_lock -- never call with it held.
++ */
++int kfd_bc250_flush_by_runlist(struct kfd_node *dev, int site); /* bc250 map-side flush (generic) */
++
+ #endif /* KFD_DEVICE_QUEUE_MANAGER_H_ */
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+index ff7a895bd..918cb067a 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_svm.c
+@@ -36,6 +36,7 @@
+ #include "amdgpu_reset.h"
+ #include "kfd_priv.h"
+ #include "kfd_svm.h"
++#include "kfd_device_queue_manager.h"
+ #include "kfd_migrate.h"
+ #include "kfd_smi_events.h"
+ 
+@@ -1465,6 +1466,8 @@ svm_range_unmap_from_gpus(struct svm_range *prange, unsigned long start,
+ 				break;
+ 		}
+ 		kfd_flush_tlb(pdd);
++		/* BC-250: SVM unmap (bc250 map-side flush (generic)) */
++		kfd_bc250_flush_by_runlist(pdd->dev, 1);
+ 	}
+ 
+ 	return r;
+@@ -1614,6 +1617,8 @@ svm_range_map_to_gpus(struct svm_range *prange, unsigned long offset,
+ 		}
+ 
+ 		kfd_flush_tlb(pdd);
++		/* BC-250: rebuild on SVM map, the case that actually faults (bc250 map-side flush (generic)) */
++		kfd_bc250_flush_by_runlist(pdd->dev, 2);
+ 	}
+ 
+ 	return r;
+-- 
+2.56.0
+

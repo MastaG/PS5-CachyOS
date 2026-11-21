@@ -1,0 +1,82 @@
+From 8adce7410c9137ed55cff3a734000f398f53dfcf Mon Sep 17 00:00:00 2001
+From: MastaG <mastag@gmail.com>
+Date: Sat, 21 Nov 2026 01:45:11 +0100
+Subject: [PATCH 16/16] drm/amdgpu, amdkfd: PS5 Pro (Viola, 0x13DA) in the
+ GFX1013 compute gates
+
+The Viola GPU is GC 10.1.3 like the PS5 and the BC-250, but the device-ID
+gates only matched 0x13FE (and 0x13FB for the gfxoff guard). Add 0x13DA to:
+- the KFD gfxoff guard in amdgpu_amdkfd_set_compute_idle() (GFXOFF held
+  off while compute queues are active),
+- the KFD VMID MMIO flush in gmc_v10_0_flush_gpu_tlb(),
+- bc250_gfx_queues (second gfx ring) and bc250_flush_by_runlist.
+
+Tested on a PS5 Pro (Viola, firmware 11.60), kernel 7.3.5-pc8fe + these
+patches: Viola GPU firmware, 30 WGPs, sustained GPU load without ring
+timeouts, resets or VM flush errors.
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd.c            | 3 ++-
+ drivers/gpu/drm/amd/amdgpu/gfx_v10_0.c                | 3 ++-
+ drivers/gpu/drm/amd/amdgpu/gmc_v10_0.c                | 3 ++-
+ drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c | 3 ++-
+ 4 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd.c
+index 61b8ae553..64f16e4e0 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd.c
+@@ -752,7 +752,8 @@ void amdgpu_amdkfd_set_compute_idle(struct amdgpu_device *adev, bool idle)
+ {
+ 	enum amd_powergating_state state = idle ? AMD_PG_STATE_GATE : AMD_PG_STATE_UNGATE;
+ 	bool gfx1013 = (adev->pdev->device == 0x13FE ||
+-			adev->pdev->device == 0x13FB) &&
++			adev->pdev->device == 0x13FB ||
++			adev->pdev->device == 0x13DA) &&  /* PS5 Pro (Viola) */
+ 		amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(10, 1, 3);
+ 	bool manage_gfxoff;
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/gfx_v10_0.c b/drivers/gpu/drm/amd/amdgpu/gfx_v10_0.c
+index 01e13c344..bd0e49367 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gfx_v10_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gfx_v10_0.c
+@@ -65,7 +65,8 @@ MODULE_PARM_DESC(bc250_gfx_queues, "BC-250: graphics queues of gfx pipe 0 amdgpu
+ #define BC250_PCI_DEVICE_ID_GFX 0x13FE
+ static bool bc250_two_gfx_queues(struct amdgpu_device *adev)
+ {
+-	return bc250_gfx_queues >= 2 && amdgpu_async_gfx_ring && adev->pdev->device == BC250_PCI_DEVICE_ID_GFX;
++	return bc250_gfx_queues >= 2 && amdgpu_async_gfx_ring && (adev->pdev->device == BC250_PCI_DEVICE_ID_GFX ||
++		adev->pdev->device == 0x13DA);  /* PS5 Pro (Viola) */
+ }
+ #define GFX10_MEC_HPD_SIZE	2048
+ 
+diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v10_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v10_0.c
+index 2997b7539..513b19eb8 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gmc_v10_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gmc_v10_0.c
+@@ -365,7 +365,8 @@ static void gmc_v10_0_flush_gpu_tlb(struct amdgpu_device *adev, uint32_t vmid,
+ 	 * seconds each). Take the same MMIO, semaphore-guarded, type-0 path as
+ 	 * the PASID flushes.
+ 	 */
+-	bool bc250_kfd_vmid = adev->pdev->device == 0x13FE &&
++	bool bc250_kfd_vmid = (adev->pdev->device == 0x13FE ||
++			       adev->pdev->device == 0x13DA) &&  /* PS5 Pro (Viola) */
+ 		amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(10, 1, 3) &&
+ 		vmhub == AMDGPU_GFXHUB(0) &&
+ 		vmid >= adev->vm_manager.first_kfd_vmid;
+diff --git a/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c b/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
+index 02a9a1539..97aa9f7cf 100644
+--- a/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
++++ b/drivers/gpu/drm/amd/amdkfd/kfd_device_queue_manager.c
+@@ -4138,7 +4138,8 @@ int kfd_bc250_flush_by_runlist(struct kfd_node *dev, int site)
+ 
+ 	if (!(bc250_flush_by_runlist & site) || !dev || !dev->adev || !dev->adev->pdev)
+ 		return 0;
+-	if (dev->adev->pdev->device != BC250_PCI_DEVICE_ID)
++	if (dev->adev->pdev->device != BC250_PCI_DEVICE_ID &&
++	    dev->adev->pdev->device != 0x13DA)  /* PS5 Pro (Viola) */
+ 		return 0;
+ 
+ 	dqm = dev->dqm;
+-- 
+2.56.0
+
