@@ -1,7 +1,7 @@
 # Proton with FSR 4
 
 > [!NOTE]
-> Copied from [linux-cachyos-bc250](https://github.com/MastaG/linux-cachyos-bc250#fsr4-capable-proton-opt-in) (`bfb1d54b`), where these packages are
+> Copied from the linux-cachyos-bc250 repository (`bfb1d54b`, its README), where these packages are
 > built. The PS5 has the same GPU family (GFX1013) as the BC-250 board and the image ships the same
 > Mesa, and the packages come from the `[bc250-cachyos]` repo the image already has. **Everything this
 > page says was measured or tested "on a BC-250" was measured on that board, not on a PS5**: clocks,
@@ -190,7 +190,7 @@ skipped and named in Steam's log.
 
 Known working OptiScaler settings per game are applied by themselves. They come
 from two sources, merged every night into one file on the
-[`bc250-game-presets`](https://github.com/MastaG/linux-cachyos-bc250/releases/tag/bc250-game-presets)
+`bc250-game-presets` (a release of the linux-cachyos-bc250 repository)
 release:
 
 - [FreeFG](https://github.com/daniel-h-0/freefg)'s recipes for the games its
@@ -445,8 +445,8 @@ the RC12 bridge are unsigned; each is pinned by SHA256 and its origin is written
 into the prefix (`Licenses/THIRD-PARTY-UPSCALER.txt`, notices under
 `Licenses/<version>/`), so they are reproducible, not vouched for.
 
-Design and packaging details are in [docs/FSR4-PROTON.md](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/FSR4-PROTON.md)
-and [packages/bc250-fsr4-common/README.md](https://github.com/MastaG/linux-cachyos-bc250/blob/main/packages/bc250-fsr4-common/README.md).
+Design and packaging details are in [FSR4-PROTON.md](FSR4-PROTON.md)
+and `packages/bc250-fsr4-common/README.md` in the linux-cachyos-bc250 repository.
 
 ## FreeFG: XeSS frame generation for the BC-250 (the default)
 

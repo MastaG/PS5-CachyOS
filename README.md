@@ -47,7 +47,7 @@ Everything upstream's image has is still in this one (Gaming Mode, HDR, FreeSync
 | | Upstream ([abrocoma/PS5-CachyOS](https://github.com/abrocoma/PS5-CachyOS)) | This fork |
 |---|---|---|
 | **File system** | ext4 | **btrfs** with CachyOS's subvolumes (`@`, `@home`, `@root`, `@srv`, `@cache`, `@log`, `@tmp`), zstd compression, **snapper** snapshots before and after every pacman run, btrfs Assistant |
-| **Kernel** | 7.3.5-pc8fe | **7.3.5-pc8fe-bc1**: the same kernel plus the GFX1013 **amdgpu/KFD fixes** of [linux-cachyos-bc250](https://github.com/MastaG/linux-cachyos-bc250) (`patches/0008`-`0016`), which make GPU compute reliable: [KytyPS5-Native](#8-emulators) and [AI/LLM work](#9-ai-and-gpu-compute) (llama.cpp, ComfyUI, ROCm). Upstream's kernel stays on the boot partition as the `.bak` fallback |
+| **Kernel** | 7.3.5-pc8fe | **7.3.5-pc8fe-bc1**: the same kernel plus the GFX1013 **amdgpu/KFD fixes** of linux-cachyos-bc250 (`patches/0008`-`0016`), which make GPU compute reliable: [KytyPS5-Native](#8-emulators) and [AI/LLM work](#9-ai-and-gpu-compute) (llama.cpp, ComfyUI, ROCm). Upstream's kernel stays on the boot partition as the `.bak` fallback |
 | **Kernel command line** | | the BC-250's compute settings (`ttm.pages_limit`, `amdgpu.sched_policy=2`, `cwsr_enable=0`, `vm_update_mode=0`, `bc250_gfx_eop_events=2`) and zswap |
 | **Mesa** | Arch's | the BC-250 Mesa from `[bc250-cachyos]`: built for Zen 2, GFX1013 compute queue fix, FSR 4 support. Mesh shaders (DirectMesh) stay off on the PS5: they hang the PS5 Pro's GPU in Vulkan CTS |
 | **Swap** | zram | a swap file in its own subvolume (32 GB on a 128 GB+ drive) with zswap in front |
@@ -170,7 +170,7 @@ The PS5 boots into **Gaming Mode** every time: Steam's console interface, as on 
 
 ## 5. Updating
 
-Click **Update PS5 CachyOS** on the desktop (switch to the desktop first). Steam's own "up to date" message doesn't cover the system. In this fork it updates from this repo: the **7.3.5-pc8fe-bc** kernel line, this fork's fan curve, and system packages including the BC-250 Mesa from [linux-cachyos-bc250](https://github.com/MastaG/linux-cachyos-bc250). Every package update is a [snapshot](#snapshots) you can go back to.
+Click **Update PS5 CachyOS** on the desktop (switch to the desktop first). Steam's own "up to date" message doesn't cover the system. In this fork it updates from this repo: the **7.3.5-pc8fe-bc** kernel line, this fork's fan curve, and system packages including the BC-250 Mesa from linux-cachyos-bc250. Every package update is a [snapshot](#snapshots) you can go back to.
 
 On an older install without that icon, run this once on the desktop as your normal user (**without** `sudo`):
 
@@ -299,21 +299,21 @@ The `[bc250-cachyos]` repo has three Proton builds with **FSR 4** ready to use: 
 sudo pacman -S proton-cachyos-native-bc250 proton-cachyos-slr-bc250 protonge-latest-bc250
 ```
 
-Don't install `linux-cachyos-bc250-meta`: it pulls in the BC-250 kernel, which doesn't boot on a PS5. Restart Steam, then pick one under a game's **Properties → Compatibility**. Launch options, the upscaler menu, per-game settings and the anti-cheat caveats: **[docs/PROTON.md](docs/PROTON.md)**.
+Don't install `linux-cachyos-bc250-meta`: it pulls in the BC-250 kernel, which doesn't boot on a PS5. Restart Steam, then pick one under a game's **Properties → Compatibility**. Launch options, the upscaler menu, per-game settings and the anti-cheat caveats: **[docs/PROTON.md](docs/PROTON.md)** (how they're built: [docs/FSR4-PROTON.md](docs/FSR4-PROTON.md)).
 
 ## 9. AI and GPU compute
 
-The kernel carries the GFX1013 compute (KFD) fixes of [linux-cachyos-bc250](https://github.com/MastaG/linux-cachyos-bc250) (`patches/0008`-`0016`, [KERNEL-SOURCE.md](kernel/KERNEL-SOURCE.md)), the same GPU family as the BC-250 board, and the image ships its Mesa. So that repo's AI guides apply here:
+The kernel carries the GFX1013 compute (KFD) fixes made for the BC-250 board (same GPU family; `patches/0008`-`0016`, [KERNEL-SOURCE.md](kernel/KERNEL-SOURCE.md)), and the image ships the BC-250 Mesa. The BC-250's AI guides therefore apply here, copied into this repo with notes where the PS5 differs:
 
-- **[Local AI on the BC-250](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/AI.md)**: chat with llama.cpp (Vulkan) and images with ComfyUI.
-- **[ROCm / KFD support](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/ROCM.md)**: why the patches are needed, ROCm and the `bc250-pytorch` package (from the `[bc250-cachyos]` repo the image already has).
-- **[AI benchmarks](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/AI-BENCHMARKS.md)**: what was measured on the BC-250, and what else was tried.
+- **[Local AI](docs/AI.md)**: chat with llama.cpp (Vulkan) and images with ComfyUI.
+- **[ROCm / KFD support](docs/ROCM.md)**: why the patches are needed, ROCm and the `bc250-pytorch` package (from the `[bc250-cachyos]` repo the image already has).
+- **[AI benchmarks](docs/AI-BENCHMARKS.md)**: what was measured on the BC-250, and what else was tried.
 
 What's different on the PS5:
 
-- **Kernel parameters:** `ttm.pages_limit=3670016` and `amdgpu.sched_policy=2` are already in this image's `cmdline.txt`; skip the guide's Limine steps. The `steam` user is in the `render` group (`/dev/kfd`).
+- **Kernel parameters:** `ttm.pages_limit=3670016` and `amdgpu.sched_policy=2` are already in this image's `cmdline.txt`. The `steam` user is in the `render` group (`/dev/kfd`).
 - **No CU unlock:** `amdgpu.bc250_cc_write_mode` / `bc250_cc_wgp_mask` are BC-250 only and not in this kernel.
-- **Numbers:** the guide's benchmarks are BC-250 measurements; the PS5's clocks, CU count and memory differ ([boost](#7-extras-boost-fan-and-video) helps). The PS5 Pro gives Linux about 15 GiB of memory, shared by the CPU and GPU, so the guide's "one at a time" applies here too: close Gaming Mode's games (or use the desktop) before loading a big model.
+- **Numbers:** the guide's benchmarks are BC-250 measurements; the PS5's clocks, CU count and memory differ ([boost](#7-extras-boost-fan-and-video) helps). The PS5 Pro gives Linux about 15 GiB of memory, shared by the CPU and GPU, so the guide's "one at a time" applies here too: stop Gaming Mode before loading a big model ([how](docs/AI.md#before-you-start-server-mode)).
 
 ## 10. Installing to the internal M.2
 
@@ -386,4 +386,4 @@ Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 sec
 - **[abrocoma/PS5-CachyOS](https://github.com/abrocoma/PS5-CachyOS)**: the guide, the image and nearly all fixes this fork builds on. If the guide helped you, you can [buy abrocoma a coffee on Ko-fi](https://ko-fi.com/abrocoma).
 - **[soniciso1/ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases)**: Linux loader with 13.60 support
 - **[ps5-linux](https://github.com/ps5-linux)**: [image](https://github.com/ps5-linux/ps5-linux-image) upstream's image is built on, [kernel patches](https://github.com/ps5-linux/ps5-linux-patches), [Wi-Fi driver](https://github.com/ps5-linux/ps5-linux-mwifiex), [tools](https://github.com/ps5-linux/ps5-linux-tools)
-- **[linux-cachyos-bc250](https://github.com/MastaG/linux-cachyos-bc250)** and **[bc250-emulators](https://github.com/MastaG/bc250-emulators)**: the GFX1013 kernel patches, Mesa and emulator packages of this fork
+- **linux-cachyos-bc250** and **[bc250-emulators](https://github.com/MastaG/bc250-emulators)**: the GFX1013 kernel patches, Mesa and emulator packages of this fork
