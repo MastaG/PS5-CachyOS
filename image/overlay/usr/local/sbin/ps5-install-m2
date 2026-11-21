@@ -43,6 +43,8 @@ grep -qw "LABEL=$LABEL" /proc/cmdline && die "the kernel already uses LABEL=$LAB
 for c in git cc rsync mkfs.btrfs btrfs partprobe; do command -v "$c" >/dev/null || die "$c is missing (sudo pacman -S --needed git base-devel rsync btrfs-progs parted)"; done
 
 size=$(lsblk -bndo SIZE "$NVME"); used=$(btrfs filesystem usage -b / 2>/dev/null | awk '/Used:/ { print $2; exit }')
+swap=$(stat -c %s /var/swap/swapfile 2>/dev/null || echo 0)   # not copied, made again on the M.2
+used=$((used - swap))
 printf 'M.2:    %s  %s, %d GB\n' "$NVME" "$(lsblk -ndo MODEL "$NVME" | sed 's/ *$//')" $((size / 1000000000))
 printf 'Copy:   %d GB from %s (compressed size on disk)\n' $((used / 1000000000)) "/dev/$root_disk"
 lsblk -o NAME,SIZE,FSTYPE,LABEL "$NVME" | sed 's/^/        /'
@@ -64,14 +66,16 @@ for _ in $(seq 20); do [ -b "$PART" ] && break; sleep 0.5; done
 [ -b "$PART" ] || die "$PART did not appear after m2_init."
 
 echo "== Creating btrfs (LABEL=$LABEL)"
+# An older install's file system signature (ext4 at 1 KiB) would survive mkfs.btrfs and win the probe.
+wipefs -aq "$PART"
 mkfs.btrfs -q -f -L "$LABEL" "$PART"
 mkdir -p "$MNT"
-mount -o "$OPTS" "$PART" "$MNT"
+mount -t btrfs -o "$OPTS" "$PART" "$MNT"
 for s in $SUBVOLS; do btrfs -q subvolume create "$MNT/$s"; done
 umount "$MNT"
-mount -o "$OPTS,subvol=@" "$PART" "$MNT"
+mount -t btrfs -o "$OPTS,subvol=@" "$PART" "$MNT"
 for m in home:@home root:@root srv:@srv var/cache:@cache var/log:@log var/tmp:@tmp; do
-	mkdir -p "$MNT/${m%%:*}"; mount -o "$OPTS,subvol=${m##*:}" "$PART" "$MNT/${m%%:*}"
+	mkdir -p "$MNT/${m%%:*}"; mount -t btrfs -o "$OPTS,subvol=${m##*:}" "$PART" "$MNT/${m%%:*}"
 done
 mkdir -p "$MNT/var"
 btrfs -q subvolume create "$MNT/.snapshots"
