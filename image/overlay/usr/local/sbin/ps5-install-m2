@@ -40,6 +40,9 @@ findmnt -no SOURCE "$BOOT" >/dev/null || die "$BOOT is not mounted."
 	die "$BOOT is not on the USB SSD this system runs from."
 if lsblk -lno MOUNTPOINTS "$NVME" | grep -q .; then die "something on $NVME is mounted. Unmount it first."; fi
 grep -qw "LABEL=$LABEL" /proc/cmdline && die "the kernel already uses LABEL=$LABEL as root."
+# The copy would bring the first-boot setup screen along, and the M.2 would wait on it (on a screen that
+# often stays black at that point).
+[ -e /etc/ps5-first-boot-done ] || die "finish the first-boot setup screen first (or: sudo touch /etc/ps5-first-boot-done)."
 for c in git cc rsync mkfs.btrfs btrfs partprobe; do command -v "$c" >/dev/null || die "$c is missing (sudo pacman -S --needed git base-devel rsync btrfs-progs parted)"; done
 
 size=$(lsblk -bndo SIZE "$NVME"); used=$(btrfs filesystem usage -b / 2>/dev/null | awk '/Used:/ { print $2; exit }')
