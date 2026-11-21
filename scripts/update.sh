@@ -193,7 +193,7 @@ fi
 
 [ -t 1 ] && printf '\033[H\033[2J'
 RULE='──────────────────────────────────────────────────────────────'
-printf '%sPS5 CachyOS Updater%s\n' "$BLD" "$OFF"
+printf '%sPS5 CachyOS Updater%s   %sgithub.com/abrocoma/PS5-CachyOS%s\n' "$BLD" "$OFF" "$DIM" "$OFF"
 printf '%s%s%s\n' "$DIM" "$RULE" "$OFF"
 printf '%sKernel, fixes, Gaming Mode extras and system packages.%s\n' "$DIM" "$OFF"
 printf '%sYour files and settings stay as they are.%s\n' "$DIM" "$OFF"
@@ -307,6 +307,28 @@ if ask "Update system packages and apps now? Takes a few minutes." y; then
 	fi
 else
 	skip "System packages" "aborted"
+fi
+
+# Optional extras, only offered while they're not installed
+if ! pacman -Q xone-dkms >/dev/null 2>&1; then
+	printf '%s  %sOptional:%s  x = driver for the Xbox Wireless Adapter (USB dongle)\n\n    %sEnter = done%s' "$CL" "$BLD" "$OFF" "$DIM" "$OFF"
+	k=$(key)
+	if [ -n "$CL" ]; then printf '\r\033[K\033[1A\r\033[K\033[1A\r\033[K'; else echo; fi
+	case $k in
+	x|X)
+		busy "Xbox adapter" "installing headers and driver (2-5 min)"
+		# headers first, so DKMS builds xone as soon as it's installed
+		xbox_step() {
+			fetch update-kernel.sh | kernel_sh -s -- --headers &&
+				sudo pacman -S --needed --noconfirm gcc make dkms xone-dkms xone-dongle-firmware
+		}
+		if run Xbox xbox_step && dkms status xone 2>/dev/null | grep -q "$(uname -r).*installed"; then
+			ok "Xbox adapter" "driver installed: restart, then pair dongle and controller"; RESTART=1
+		else
+			bad "Xbox adapter" "failed"; why Xbox
+		fi
+		;;
+	esac
 fi
 
 echo
