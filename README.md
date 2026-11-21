@@ -54,7 +54,7 @@ Everything upstream's image has is still in this one (Gaming Mode, HDR, FreeSync
 | **Gaming Mode** | boots the mode used last | boots **Gaming Mode every time**; Steam runs as a user service, so KytyPS5 can close Steam while a game runs and bring it back |
 | **Desktop** | | Steam starts in the background with the desktop |
 | **Emulators** | | the [bc250-emulators](https://github.com/MastaG/bc250-emulators) repo is set up (nothing installed): KytyPS5-Native, Lichii, with Steam shortcuts in collections |
-| **Proton** | | the [FSR 4 Proton builds](#proton-with-fsr-4) are available from `[bc250-cachyos]` |
+| **Proton** | | the [FSR 4 Proton builds](docs/PROTON.md) are available from `[bc250-cachyos]` |
 | **Boost** | an `install.sh` extra | `sudo ps5-boost on` / `off`, off by default |
 | **Fan** | quiet curve | a smoother curve (no silent-to-loud jumps) |
 | **Internal M.2** | | `sudo ps5-install-m2` |
@@ -293,16 +293,13 @@ Run them again after adding or removing games (`--dry-run` shows what would chan
 
 ### Proton with FSR 4
 
-The `[bc250-cachyos]` repo has three Proton builds with **FSR 4** ready to use (the AMD FSR 4 provider, OptiScaler and a known-good configuration inside): `proton-cachyos-native-bc250` (fastest, no anti-cheat games), `proton-cachyos-slr-bc250` (Steam Linux Runtime, anti-cheat games) and `protonge-latest-bc250` (GE-Proton). Install them **one by one**:
+The `[bc250-cachyos]` repo has three Proton builds with **FSR 4** ready to use: `proton-cachyos-native-bc250` (fastest, no anti-cheat games), `proton-cachyos-slr-bc250` (Steam Linux Runtime, anti-cheat games) and `protonge-latest-bc250` (GE-Proton):
 
 ```sh
 sudo pacman -S proton-cachyos-native-bc250 proton-cachyos-slr-bc250 protonge-latest-bc250
 ```
 
-> [!WARNING]
-> **Don't install `linux-cachyos-bc250-meta`** on the PS5: it pulls in the BC-250 kernel, which doesn't boot on a PS5. The PS5 kernel comes from this repo's updater.
-
-Restart Steam, then pick one under a game's **Properties → Compatibility**. How to use them, per-game settings and the anti-cheat caveats: [FSR4-capable Proton](https://github.com/MastaG/linux-cachyos-bc250#fsr4-capable-proton-opt-in) in linux-cachyos-bc250's README, details in [FSR4-PROTON.md](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/FSR4-PROTON.md).
+Don't install `linux-cachyos-bc250-meta`: it pulls in the BC-250 kernel, which doesn't boot on a PS5. Restart Steam, then pick one under a game's **Properties → Compatibility**. Launch options, the upscaler menu, per-game settings and the anti-cheat caveats: **[docs/PROTON.md](docs/PROTON.md)**.
 
 ## 9. AI and GPU compute
 
