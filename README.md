@@ -31,8 +31,9 @@
 6. [Display, FreeSync and HDR](#6-display-freesync-and-hdr)
 7. [Extras: boost, fan and video](#7-extras-boost-fan-and-video)
 8. [Emulators](#8-emulators)
-9. [Installing to the internal M.2](#9-installing-to-the-internal-m2)
-10. [Troubleshooting](#10-troubleshooting)
+9. [AI and GPU compute](#9-ai-and-gpu-compute)
+10. [Installing to the internal M.2](#10-installing-to-the-internal-m2)
+11. [Troubleshooting](#11-troubleshooting)
 
 [Advanced](docs/advanced.md): the official image, building your own kernel, what's in this repo.
 
@@ -266,7 +267,21 @@ lichii-steam-sync           # game files in ~/Games/Switch2
 
 Run them again after adding or removing games (`--dry-run` shows what would change). They stop and restart Steam to write its shortcut list. In Gaming Mode, KytyPS5 closes Steam while a game runs (more memory for the game) and brings it back when the game ends. See the [bc250-emulators README](https://github.com/MastaG/bc250-emulators) for the settings of each emulator.
 
-## 9. Installing to the internal M.2
+## 9. AI and GPU compute
+
+The kernel carries the GFX1013 compute (KFD) fixes of [linux-cachyos-bc250](https://github.com/MastaG/linux-cachyos-bc250) (`patches/0008`-`0016`, [KERNEL-SOURCE.md](kernel/KERNEL-SOURCE.md)), the same GPU family as the BC-250 board, and the image ships its Mesa. So that repo's AI guides apply here:
+
+- **[Local AI on the BC-250](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/AI.md)**: chat with llama.cpp (Vulkan) and images with ComfyUI.
+- **[ROCm / KFD support](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/ROCM.md)**: why the patches are needed, ROCm and the `bc250-pytorch` package (from the `[bc250-cachyos]` repo the image already has).
+- **[AI benchmarks](https://github.com/MastaG/linux-cachyos-bc250/blob/main/docs/AI-BENCHMARKS.md)**: what was measured on the BC-250, and what else was tried.
+
+What's different on the PS5:
+
+- **Kernel parameters:** `ttm.pages_limit=3670016` and `amdgpu.sched_policy=2` are already in this image's `cmdline.txt`; skip the guide's Limine steps. The `steam` user is in the `render` group (`/dev/kfd`).
+- **No CU unlock:** `amdgpu.bc250_cc_write_mode` / `bc250_cc_wgp_mask` are BC-250 only and not in this kernel.
+- **Numbers:** the guide's benchmarks are BC-250 measurements; the PS5's clocks, CU count and memory differ ([boost](#7-extras-boost-fan-and-video) helps). The PS5 Pro gives Linux about 15 GiB of memory, shared by the CPU and GPU, so the guide's "one at a time" applies here too: close Gaming Mode's games (or use the desktop) before loading a big model.
+
+## 10. Installing to the internal M.2
 
 The system can run from the PS5's internal M.2 SSD instead of USB: faster, and the USB SSD is then only the boot drive.
 
@@ -283,7 +298,7 @@ The system can run from the PS5's internal M.2 SSD instead of USB: faster, and t
 
 **Back to the USB system:** `sudo ps5-install-m2 --usb-root` (restores `cmdline.txt.usb-root`), then restart. The kernel updater handles a USB boot partition with an M.2 root.
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### Black screen
 
