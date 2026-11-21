@@ -1,0 +1,5 @@
+[Desktop Entry]
+Comment=Start Steam silently in the desktop (Gaming Mode starts its own Steam)
+Exec=/usr/bin/steam -silent -steamdeck
+Name=Steam
+Type=Application

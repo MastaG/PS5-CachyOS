@@ -19,6 +19,7 @@ models, but this image has not been run on a launch or Slim PS5.
 | **Gaming Mode** | Steam runs as the user unit `steam-launcher.service` (`/usr/local/bin/ps5-steam-session`), so KytyPS5 can unload Steam while a game runs and bring it back afterwards, as on the BC-250. |
 | **Fan** | A smoother curve (`/usr/local/sbin/ps5-fan-curve`, 50 °C → 40 … 80 °C → 125, 88 °C → 255): no jumps from silent to loud. |
 | **Boost** | Off by default. `sudo ps5-boost on` builds `ps5_control` from [ps5-linux-tools](https://github.com/ps5-linux/ps5-linux-tools) and keeps boost on after a reboot; `sudo ps5-boost off` undoes it. |
+| **Steam in the desktop** | Starts with the desktop (`/etc/xdg/autostart/steam.desktop`, `steam -silent -steamdeck`, as on the BC-250). Gaming Mode starts its own Steam. |
 | **Boot session** | Every boot starts in Gaming Mode, as on SteamOS (`~/.config/ps5-boot-session` = `gamescope`, applied by `ps5-boot-session.service`). Switch to Desktop works as before until the next restart. To boot into the desktop instead, put `plasma` in that file; delete it to start in the mode used last (upstream's behaviour). |
 | **Internal M.2** | `sudo ps5-install-m2` (below). |
 | **Tools** | base-devel, git, rsync, unzip, compsize. The `steam` user is in the `render` group (GPU compute through `/dev/kfd`). |
