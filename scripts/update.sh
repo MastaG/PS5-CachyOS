@@ -242,6 +242,7 @@ if [ "${1:-}" = "--rollback" ]; then
 fi
 
 [ -t 1 ] && printf '\033[H\033[2J'
+echo   # a little room above the header
 # newest kernel version and date from the repo (also shown in the header)
 ks=$(curl -fsSL --max-time 30 "$R/update-kernel.sh" 2>/dev/null)
 new=$(printf '%s\n' "$ks" | sed -n 's/^KVER=//p' | head -1)
