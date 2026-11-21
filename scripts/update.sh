@@ -174,8 +174,12 @@ if [ "${1:-}" = "--rollback" ]; then
 fi
 
 [ -t 1 ] && printf '\033[H\033[2J'
+RULE='──────────────────────────────────────────────────────────────'
 printf '%sPS5 CachyOS Updater%s\n' "$BLD" "$OFF"
-printf '%sKernel, fixes, Gaming Mode extras and system packages. Your files and settings stay as they are.%s\n\n' "$DIM" "$OFF"
+printf '%s%s%s\n' "$DIM" "$RULE" "$OFF"
+printf '%sKernel, fixes, Gaming Mode extras and system packages.%s\n' "$DIM" "$OFF"
+printf '%sYour files and settings stay as they are.%s\n' "$DIM" "$OFF"
+printf '%s%s%s\n\n' "$DIM" "$RULE" "$OFF"
 sudo -v || exit 1
 # keep sudo alive through long steps
 ( while sleep 50; do sudo -n -v 2>/dev/null || exit 0; done ) &
