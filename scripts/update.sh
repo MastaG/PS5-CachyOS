@@ -69,18 +69,18 @@ header() {
 		"Kernel, fixes, extras, packages."     "$DIM" "██           ██      ██" "${DIM}Memory$OFF   $mem" \
 		"Your files and settings stay as"      "$DIM" "██      ███████ ███████" "${DIM}Disk$OFF     $disk" \
 		"they are."                            "$DIM" "                       " "${DIM}Uptime$OFF   $up"
-	if [ "$cols" -ge 100 ]; then
-		while [ $# -ge 4 ]; do printf '  %s%-34s%s  %s%s%s   %s\n' "$2" "$1" "$OFF" "$BLU" "$3" "$OFF" "$4"; shift 4; done
+	if [ "$cols" -ge 104 ]; then
+		while [ $# -ge 4 ]; do printf '  %s%-34s%s %s│%s  %s%s%s  %s│%s  %s\n' "$2" "$1" "$OFF" "$DIM" "$OFF" "$BLU" "$3" "$OFF" "$DIM" "$OFF" "$4"; shift 4; done
 	else
 		# not wide enough for three columns: the logo goes on top
 		printf '  %s%s%s\n' "$BLU" "██████  ███████ ███████" "$OFF" "$BLU" "██   ██ ██      ██     " "$OFF" \
 			"$BLU" "██████  ███████ ███████" "$OFF" "$BLU" "██           ██      ██" "$OFF" "$BLU" "██      ███████ ███████" "$OFF"
 		echo
 	fi
-	if [ "$cols" -ge 100 ]; then
+	if [ "$cols" -ge 104 ]; then
 		:
 	elif [ "$cols" -ge 74 ]; then
-		while [ $# -ge 4 ]; do printf '  %s%-34s%s  %s\n' "$2" "$1" "$OFF" "$4"; shift 4; done
+		while [ $# -ge 4 ]; do printf '  %s%-34s%s %s│%s  %s\n' "$2" "$1" "$OFF" "$DIM" "$OFF" "$4"; shift 4; done
 	else
 		while [ $# -ge 4 ]; do printf '  %s%s%s\n' "$2" "$1" "$OFF"; shift 4; done
 		echo
@@ -123,10 +123,8 @@ install_updater() {
 	cat > "$UBIN/ps5-update" <<PS5EOF
 #!/bin/sh
 # Runs the newest PS5 CachyOS updater from GitHub.
-# The icon opens this Konsole window with its own state folder, so it doesn't reuse the size of
-# your other Konsole windows: forget its last size (it always opens at the icon's 104 x 32),
-# and don't pass that folder on to the update itself.
-rm -f "\$HOME/.local/state/ps5-update/konsolestaterc"
+# The icon opens this Konsole window with its own, read-only state folder, so it always opens at
+# the icon's 104 x 32 instead of the last size; don't pass that folder on to the update itself.
 unset XDG_STATE_HOME
 curl -fsSL "$R/update.sh?t=\$(date +%s)" | sh
 echo
@@ -149,6 +147,9 @@ notify-send -a "PS5 CachyOS" -i system-software-update "PS5 CachyOS update avail
 	"Kernel $new is out (you have $cur). Open \"Update PS5 CachyOS\" on the desktop." && echo "$new" > "$seen"
 PS5EOF
 	chmod 755 "$UBIN/ps5-update" "$UBIN/ps5-update-check"
+	# read-only state folder for the updater's Konsole window: it can't remember a size
+	st="$HOME/.local/state/ps5-update"
+	mkdir -p "$st"; chmod 755 "$st"; rm -f "$st/konsolestaterc"; chmod 555 "$st"
 	# Breeze's update icon, framed tighter so it's as big as the other desktop icons
 	mkdir -p "$HOME/.local/share/icons"
 	cat > "$HOME/.local/share/icons/ps5-update-circle.svg" <<'PS5EOF'
@@ -168,7 +169,7 @@ PS5EOF
 Type=Application
 Name=Update PS5 CachyOS
 Comment=Install the newest PS5 kernel, fixes, extras and system updates
-Exec=env XDG_STATE_HOME=$HOME/.local/state/ps5-update konsole --hide-menubar --hide-tabbar -p TerminalColumns=104 -p TerminalRows=32 -p "LocalTabTitleFormat=PS5 CachyOS Updater" -e $UBIN/ps5-update
+Exec=env XDG_STATE_HOME=$HOME/.local/state/ps5-update konsole --hide-menubar --hide-tabbar --hide-toolbars -p TerminalColumns=104 -p TerminalRows=32 -p "LocalTabTitleFormat=PS5 CachyOS Updater" -e $UBIN/ps5-update
 Icon=$HOME/.local/share/icons/ps5-update-circle.svg
 Terminal=false
 Categories=System;
@@ -203,6 +204,7 @@ remove_updater() {
 	rm -f "$UNIT/ps5-update-check.service" "$UNIT/ps5-update-check.timer" "$UBIN/ps5-update" "$UBIN/ps5-update-check" \
 		"$DESK/ps5-update.desktop" "$APPS/ps5-update.desktop" "$HOME/.cache/ps5-update-notified" \
 		"$HOME/.local/share/icons/ps5-update-circle.svg"
+	[ -d "$HOME/.local/state/ps5-update" ] && chmod 755 "$HOME/.local/state/ps5-update" && rm -rf "$HOME/.local/state/ps5-update"
 	systemctl --user daemon-reload 2>/dev/null
 	echo "Removed the updater icon and the daily check."
 }
