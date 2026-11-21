@@ -32,8 +32,9 @@ LOG="$HOME/.cache/ps5-update.log"
 if [ -t 1 ]; then
 	GRN=$(printf '\033[32m'); RED=$(printf '\033[31m'); YEL=$(printf '\033[33m')
 	BLD=$(printf '\033[1m'); DIM=$(printf '\033[2m'); OFF=$(printf '\033[0m'); CL=$(printf '\r\033[K')
+	BLU=$(printf '\033[38;5;33m')
 else
-	GRN= RED= YEL= BLD= DIM= OFF= CL=
+	GRN= RED= YEL= BLD= DIM= OFF= CL= BLU=
 fi
 line() { printf '%s  %s%s%s %-20s %s' "$CL" "$1" "$2" "$OFF" "$3" "$4"; }
 busy() { line "$DIM" "…" "$1" "$2"; }
@@ -46,6 +47,27 @@ run() { s=$1; shift; printf '\n===== %s =====\n' "$s" >> "$LOG"; "$@" >> "$LOG" 
 out() { awk -v m="===== $1 =====" '$0 == m { b = ""; on = 1; next } /^===== / { on = 0 } on { b = b $0 "\n" } END { printf "%s", b }' "$LOG"; }
 # the last lines of a failed step, under its line
 why() { out "$1" | grep -v '^[[:space:]]*$' | tail -n 6 | sed "s/^/      $DIM/; s/\$/$OFF/"; }
+# The block at the bottom: PS5 in block letters, and this console's info next to it.
+ps5_info() {
+	gpu=$(cat /sys/class/drm/card*/device/device 2>/dev/null | head -1)
+	ic=$(journalctl -k -b --no-pager 2>/dev/null | sed -n 's/.*HDMI IC Type \[\([A-Za-z0-9]*\)\].*/\1/p' | head -1)
+	if [ "$gpu" = 0x13da ]; then model="PS5 Pro"; elif [ "$ic" = VERDE ]; then model="PS5 Slim"; elif [ "$ic" = FLAVA3 ]; then model="PS5 Fat"; else model="PS5"; fi
+	[ -n "$ic" ] && model="$model ($ic HDMI)"
+	kern=$(uname -r); [ "$kern" = "${new:-}" ] && kern="$kern$kd"
+	plasma=$(plasmashell --version 2>/dev/null | sed -n 's/^plasmashell /KDE Plasma /p')
+	mem=$(free -h --si 2>/dev/null | awk '/^Mem:/ { print $3 " / " $2 }')
+	disk=$(df -h --output=used,size / 2>/dev/null | awk 'NR == 2 { print $1 " / " $2 }')
+	up=$(uptime -p 2>/dev/null | sed 's/^up //')
+	set -- \
+		"██████  ███████ ███████" "$BLD$model$OFF" \
+		"██   ██ ██      ██     " "${DIM}Kernel$OFF   $kern" \
+		"██████  ███████ ███████" "${DIM}Desktop$OFF  ${plasma:-KDE Plasma}" \
+		"██           ██      ██" "${DIM}Memory$OFF   $mem" \
+		"██      ███████ ███████" "${DIM}Disk$OFF     $disk" \
+		"                       " "${DIM}Uptime$OFF   $up"
+	echo
+	while [ $# -ge 2 ]; do printf '  %s%s%s    %s\n' "$BLU" "$1" "$OFF" "$2"; shift 2; done
+}
 # One key from the keyboard (also when this script itself is piped in): enter, esc or the character.
 key() {
 	old=$(stty -g </dev/tty 2>/dev/null) || { echo none; return; }
@@ -347,4 +369,5 @@ else
 	printf '%s%sAll done.%s Everything is up to date.\n' "$BLD" "$GRN" "$OFF"
 fi
 printf '%sFinished in %s. Details: %s%s\n' "$DIM" "$took" "$LOG" "$OFF"
+ps5_info
 { echo; echo "Undo steps 1-6: curl -fsSL $R/update.sh | sh -s -- --rollback"; } >> "$LOG"
