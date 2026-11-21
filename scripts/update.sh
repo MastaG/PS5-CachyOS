@@ -26,9 +26,31 @@ OPTS="hdmi.vrr=1 hdmi.extended_tmds=1"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 say() { printf '\n== %s\n' "$*"; }
+
+# One line per step; everything the steps print goes to the log.
+LOG="$HOME/.cache/ps5-update.log"
+if [ -t 1 ]; then
+	GRN=$(printf '\033[32m'); RED=$(printf '\033[31m'); YEL=$(printf '\033[33m')
+	BLD=$(printf '\033[1m'); DIM=$(printf '\033[2m'); OFF=$(printf '\033[0m'); CL=$(printf '\r\033[K')
+else
+	GRN= RED= YEL= BLD= DIM= OFF= CL=
+fi
+line() { printf '%s  %s%s%s %-20s %s' "$CL" "$1" "$2" "$OFF" "$3" "$4"; }
+busy() { line "$DIM" "…" "$1" "$2"; }
+ok()   { line "$GRN" "✓" "$1" "$2"; echo; }
+bad()  { line "$RED" "✗" "$1" "$2"; echo; }
+skip() { line "$DIM" "–" "$1" "$2"; echo; }
+# run <step> <command...>: output to the log under a marker for that step
+run() { s=$1; shift; printf '\n===== %s =====\n' "$s" >> "$LOG"; "$@" >> "$LOG" 2>&1 </dev/null; }
+# what <step> printed (for checks and error output)
+out() { awk -v m="===== $1 =====" '$0 == m { b = ""; on = 1; next } /^===== / { on = 0 } on { b = b $0 "\n" } END { printf "%s", b }' "$LOG"; }
+# the last lines of a failed step, under its line
+why() { out "$1" | grep -v '^[[:space:]]*$' | tail -n 6 | sed "s/^/      $DIM/; s/\$/$OFF/"; }
 # answers come from the keyboard, even when the script itself is piped in
 ask() { # ask "question" default(y|n)
-	d=$2; printf '%s [%s] ' "$1" "$( [ "$d" = y ] && echo Y/n || echo y/N )"
+	d=$2
+	if [ "$d" = y ]; then h="Enter = yes, n = no"; else h="Enter = no, y = yes"; fi
+	printf '%s  %s?%s %s %s[%s]%s ' "$CL" "$YEL" "$OFF" "$1" "$DIM" "$h" "$OFF"
 	read a </dev/tty 2>/dev/null || a=""
 	case "${a:-$d}" in y|Y|yes|Yes) return 0 ;; *) return 1 ;; esac
 }
@@ -44,7 +66,7 @@ install_updater() {
 # Runs the newest PS5 CachyOS updater from GitHub.
 curl -fsSL $R/update.sh | sh
 echo
-printf 'Press Enter to close'; read _
+printf "\nPress Enter to close"; read _
 PS5EOF
 	cat > "$UBIN/ps5-update-check" <<'PS5EOF'
 #!/bin/sh
@@ -66,7 +88,7 @@ PS5EOF
 Type=Application
 Name=Update PS5 CachyOS
 Comment=Install the newest PS5 kernel, fixes, extras and system updates
-Exec=konsole -e $UBIN/ps5-update
+Exec=konsole --hide-menubar --hide-tabbar -p TerminalColumns=84 -p TerminalRows=24 -p ShowTerminalSizeHint=false -p "LocalTabTitleFormat=PS5 CachyOS Updater" -e $UBIN/ps5-update
 Icon=system-software-update
 Terminal=false
 Categories=System;
@@ -136,87 +158,128 @@ if [ "${1:-}" = "--rollback" ]; then
 	exit 0
 fi
 
-echo "PS5 CachyOS updater: kernel, fixes, extras and system packages."
-echo "Your files, apps and settings are not touched. Password needed:"
+[ -t 1 ] && printf '\033[H\033[2J'
+printf '%sPS5 CachyOS Updater%s\n' "$BLD" "$OFF"
+printf '%sKernel, fixes, Gaming Mode extras and system packages. Your files and settings stay as they are.%s\n\n' "$DIM" "$OFF"
 sudo -v || exit 1
+# keep sudo alive through long steps
+( while sleep 50; do sudo -n -v 2>/dev/null || exit 0; done ) &
+KEEP=$!
+trap 'kill $KEEP 2>/dev/null' EXIT
+mkdir -p "$HOME/.cache"
+echo "PS5 CachyOS update, $(date)" > "$LOG"
+echo
+RESTART=0
 
-say "1/7 Kernel"
+# 1. Kernel
 KFAIL=0
-if ! fetch update-kernel.sh | kernel_sh; then
+new=$(curl -fsSL --max-time 30 "$R/update-kernel.sh" 2>/dev/null | sed -n 's/^KVER=//p' | head -1)
+if [ -n "$new" ] && [ "$new" != "$(uname -r)" ]; then busy "Kernel" "installing $new (1-3 min)"; else busy "Kernel" "checking"; fi
+kernel_step() { fetch update-kernel.sh | kernel_sh; }
+if run Kernel kernel_step; then
+	if out Kernel | grep -q '^Done: kernel'; then
+		ok "Kernel" "updated to $new"; RESTART=1
+	elif out Kernel | grep -q 'already on the newest kernel'; then
+		ok "Kernel" "up to date ($(uname -r))"
+	else
+		ok "Kernel" "done"
+	fi
+else
 	KFAIL=1
-	echo "The kernel update failed (see above); your current kernel stays. Continuing with the other steps."
+	bad "Kernel" "failed, your current kernel stays"; why Kernel
 fi
 
-say "2/7 Fixes"
+# 2. Fixes
+busy "Fixes" "checking"
 CD=/usr/local/bin/ps5-color-depth
-if [ -f "$CD" ]; then
-	if fetch files/ps5-color-depth > /tmp/ps5-color-depth.new && ! cmp -s /tmp/ps5-color-depth.new "$CD"; then
-		sudo cp "$CD" "$CD.bak-update" && sudo install -m 755 /tmp/ps5-color-depth.new "$CD" &&
-			echo "Colour script updated: 12-bit 4:2:2 only on FLAVA3 (fixes the colour tint on PS5 Slim)."
-	else
-		echo "Colour script already up to date."
+fixes_step() {
+	[ -f "$CD" ] || { echo "no colour script"; return 0; }
+	fetch files/ps5-color-depth > /tmp/ps5-color-depth.new || return 1
+	if ! cmp -s /tmp/ps5-color-depth.new "$CD"; then
+		sudo cp "$CD" "$CD.bak-update" && sudo install -m 755 /tmp/ps5-color-depth.new "$CD" && echo "colour script updated"
 	fi
 	rm -f /tmp/ps5-color-depth.new
+}
+if run Fixes fixes_step; then
+	if out Fixes | grep -q 'colour script updated'; then ok "Fixes" "colour script updated"; else ok "Fixes" "nothing to fix"; fi
 else
-	echo "Nothing to fix."
+	bad "Fixes" "failed"; why Fixes
 fi
 
-say "3/7 Gaming Mode extras"
-if ! fetch update-extras.sh | sudo sh; then
-	echo "Skipped: this install doesn't have the Gaming Mode these extras need (it's fine)."
+# 3. Gaming Mode and Steam extras
+busy "Gaming Mode extras" "checking"
+extras_step() { fetch update-extras.sh | sudo sh; }
+if run Extras extras_step; then
+	ok "Gaming Mode extras" "up to date"
+elif out Extras | grep -q "doesn't have the SteamOS-style Gaming Mode"; then
+	skip "Gaming Mode extras" "not used on this install"
+else
+	bad "Gaming Mode extras" "failed"; why Extras
 fi
 
-say "4/7 FreeSync and 1080p 144 Hz"
+# 4. FreeSync and 1080p 144 Hz
 if grep -q 'hdmi.vrr=1' "$CMD" 2>/dev/null; then
-	echo "Already on."
+	ok "FreeSync, 144 Hz" "on"
 elif [ ! -f "$CMD" ]; then
-	echo "Skipped: $CMD not found."
-elif ask "Turn on FreeSync (VRR) and 1080p 144 Hz? Safe to leave on; needs a restart." y; then
-	sudo cp "$CMD" "$CMD.bak-update" &&
-		sudo sed -i "1s/[[:space:]]*\$/ $OPTS/" "$CMD" &&
-		echo "Added to $CMD (old one kept as cmdline.txt.bak-update)."
+	skip "FreeSync, 144 Hz" "$CMD not found"
+elif ask "Turn on FreeSync (VRR) and 1080p 144 Hz? Safe to leave on." y; then
+	if sudo cp "$CMD" "$CMD.bak-update" && sudo sed -i "1s/[[:space:]]*\$/ $OPTS/" "$CMD"; then
+		ok "FreeSync, 144 Hz" "turned on"; RESTART=1
+	else
+		bad "FreeSync, 144 Hz" "couldn't change $CMD"
+	fi
 else
-	echo "Left off. You can run this updater again later."
+	skip "FreeSync, 144 Hz" "left off"
 fi
 
-say "5/7 Quiet fan curve (optional)"
+# 5. Quiet fan curve (optional)
 if [ -x /usr/local/sbin/ps5-fan-curve ]; then
-	echo "Already installed."
-elif ask "Install the quieter fan curve? The console runs warmer in games; watch temps on stock paste." n; then
-	fetch quiet-fan.sh | sh
+	ok "Quiet fan curve" "on"
+elif ask "Install the quieter fan curve? The console runs warmer in games." n; then
+	busy "Quiet fan curve" "installing"
+	fan_step() { fetch quiet-fan.sh | sh; }
+	if run Fan fan_step; then ok "Quiet fan curve" "installed"; else bad "Quiet fan curve" "failed"; why Fan; fi
 else
-	echo "Skipped (kernel default curve stays)."
+	skip "Quiet fan curve" "not installed (kernel default)"
 fi
 
-say "6/7 Updater"
-install_updater
+# 6. Updater icon + daily check
+if run Updater install_updater; then ok "Updater" "icon and daily check"; else bad "Updater" "failed"; why Updater; fi
 
-say "7/7 System packages and apps"
-if ask "Update CachyOS system packages (pacman -Syu) and Flatpak apps now?" y; then
-	echo "=== pacman (system packages) ==="
-	sudo pacman -Syu --needed mangohud lib32-mangohud </dev/tty
+# 7. System packages and apps
+if ask "Update system packages and apps now? Takes a few minutes." y; then
+	busy "System packages" "updating (a few minutes)"
+	if run Packages sudo pacman -Syu --noconfirm --needed mangohud lib32-mangohud; then
+		n=$(out Packages | sed -n 's/^Packages (\([0-9]*\)).*/\1/p' | head -1)
+		if [ -n "$n" ]; then ok "System packages" "$n updated"; else ok "System packages" "up to date"; fi
+	else
+		bad "System packages" "failed (run 'sudo pacman -Syu' to see why)"; why Packages
+	fi
 	if command -v flatpak >/dev/null 2>&1; then
-		echo
-		echo "=== Flatpak ==="
-		flatpak update </dev/tty
+		busy "Flatpak apps" "updating"
+		if run Flatpak flatpak update -y --noninteractive; then
+			if out Flatpak | grep -qi 'nothing to do'; then ok "Flatpak apps" "up to date"; else ok "Flatpak apps" "updated"; fi
+		else
+			bad "Flatpak apps" "failed"; why Flatpak
+		fi
 	fi
 	pacnew=$(find /etc -name '*.pacnew' -newermt '-1 hour' 2>/dev/null || true)
 	if [ -n "$pacnew" ]; then
-		echo
-		echo "New .pacnew config files (review later):"
-		echo "$pacnew"
+		printf '\n===== New .pacnew files =====\n%s\n' "$pacnew" >> "$LOG"
+		line "$YEL" "!" "Config files" "$(printf '%s\n' "$pacnew" | grep -c .) new .pacnew file(s), listed in the log"; echo
 	fi
 else
-	echo "Skipped."
+	skip "System packages" "skipped"
 fi
 
 echo
-echo "All done. Restart PS5 Linux to use the new kernel (if it changed),"
-echo "or log out/in if Plasma, KWin or glibc were updated."
-echo "Next time, just open \"Update PS5 CachyOS\" on the desktop."
-echo "To undo steps 1-6:  curl -fsSL $R/update.sh | sh -s -- --rollback"
 if [ "$KFAIL" = 1 ]; then
-	echo
-	echo "NOTE: the kernel step failed (see the top of the output). Everything else was updated."
-	echo "Run the updater again later, or open an issue with that output."
+	printf '%sDone, but the kernel step failed.%s Everything else was updated.\n' "$BLD" "$OFF"
+	echo "Run the updater again later, or open an issue with the log below."
+elif [ "$RESTART" = 1 ]; then
+	printf '%sAll done.%s Restart PS5 Linux to use the new kernel and settings.\n' "$BLD" "$OFF"
+else
+	printf '%sAll done.%s\n' "$BLD" "$OFF"
 fi
+printf '%sDetails: %s%s\n' "$DIM" "$LOG" "$OFF"
+{ echo; echo "Undo steps 1-6: curl -fsSL $R/update.sh | sh -s -- --rollback"; } >> "$LOG"
