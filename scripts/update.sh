@@ -60,17 +60,24 @@ header() {
 	mem=$(free -h --si 2>/dev/null | awk '/^Mem:/ { print $3 " / " $2 }')
 	disk=$(df -h --output=used,size / 2>/dev/null | awk 'NR == 2 { print $1 " / " $2 }')
 	up=$(uptime -p 2>/dev/null | sed 's/^up //')
+	# one colour per label (256-colour codes; empty without a terminal)
+	if [ -n "$OFF" ]; then
+		cK=$(printf '\033[38;5;135m'); cD=$(printf '\033[38;5;114m'); cM=$(printf '\033[38;5;220m')
+		cS=$(printf '\033[38;5;208m'); cU=$(printf '\033[38;5;211m')
+	else
+		cK= cD= cM= cS= cU=
+	fi
 	cols=$( (stty size </dev/tty) 2>/dev/null | awk '{ print $2 }'); [ -n "$cols" ] || cols=80
 	# left: plain text + its style; right: logo + info
 	set -- \
 		"PS5 CachyOS Updater"                  "$BLD" "██████  ███████ ███████" "$BLD$model$OFF" \
-		"github.com/abrocoma/PS5-CachyOS"      "$BLU" "██   ██ ██      ██     " "${DIM}Kernel$OFF   $kern" \
-		""                                     ""     "██████  ███████ ███████" "${DIM}Desktop$OFF  ${plasma:-KDE Plasma}" \
-		"Kernel, fixes, extras, packages."     "$DIM" "██           ██      ██" "${DIM}Memory$OFF   $mem" \
-		"Your files and settings stay as"      "$DIM" "██      ███████ ███████" "${DIM}Disk$OFF     $disk" \
-		"they are."                            "$DIM" "                       " "${DIM}Uptime$OFF   $up"
+		"github.com/abrocoma/PS5-CachyOS"      "$BLU" "██   ██ ██      ██     " "${cK}Kernel$OFF   $kern" \
+		""                                     ""     "██████  ███████ ███████" "${cD}Desktop$OFF  ${plasma:-KDE Plasma}" \
+		"Kernel, fixes, extras, packages."     "$DIM" "██           ██      ██" "${cM}Memory$OFF   $mem" \
+		"Your files and settings stay as"      "$DIM" "██      ███████ ███████" "${cS}Disk$OFF     $disk" \
+		"they are."                            "$DIM" "                       " "${cU}Uptime$OFF   $up"
 	if [ "$cols" -ge 104 ]; then
-		while [ $# -ge 4 ]; do printf '  %s%-34s%s %s│%s  %s%s%s  %s│%s  %s\n' "$2" "$1" "$OFF" "$DIM" "$OFF" "$BLU" "$3" "$OFF" "$DIM" "$OFF" "$4"; shift 4; done
+		while [ $# -ge 4 ]; do printf '  %s%-34s%s %s│%s  %s%s%s   %s\n' "$2" "$1" "$OFF" "$DIM" "$OFF" "$BLU" "$3" "$OFF" "$4"; shift 4; done
 	else
 		# not wide enough for three columns: the logo goes on top
 		printf '  %s%s%s\n' "$BLU" "██████  ███████ ███████" "$OFF" "$BLU" "██   ██ ██      ██     " "$OFF" \
@@ -84,7 +91,7 @@ header() {
 	else
 		while [ $# -ge 4 ]; do printf '  %s%s%s\n' "$2" "$1" "$OFF"; shift 4; done
 		echo
-		printf '  %s\n' "$BLD$model$OFF" "${DIM}Kernel$OFF   $kern" "${DIM}Desktop$OFF  ${plasma:-KDE Plasma}" "${DIM}Memory$OFF   $mem" "${DIM}Disk$OFF     $disk" "${DIM}Uptime$OFF   $up"
+		printf '  %s\n' "$BLD$model$OFF" "${cK}Kernel$OFF   $kern" "${cD}Desktop$OFF  ${plasma:-KDE Plasma}" "${cM}Memory$OFF   $mem" "${cS}Disk$OFF     $disk" "${cU}Uptime$OFF   $up"
 	fi
 	w=$cols; [ "$w" -gt 100 ] && w=100
 	printf '%s%s%s\n\n' "$DIM" "$(printf '%*s' "$((w - 2))" '' | sed 's/ /─/g' | sed 's/^/  /')" "$OFF"
