@@ -47,7 +47,7 @@ Everything upstream's image has is still in this one (Gaming Mode, HDR, FreeSync
 | | Upstream ([abrocoma/PS5-CachyOS](https://github.com/abrocoma/PS5-CachyOS)) | This fork |
 |---|---|---|
 | **File system** | ext4 | **btrfs** with CachyOS's subvolumes (`@`, `@home`, `@root`, `@srv`, `@cache`, `@log`, `@tmp`), zstd compression, **snapper** snapshots before and after every pacman run, btrfs Assistant |
-| **Kernel** | 7.3.5-pc8fe | **7.3.5-pc8fe-bc1**: the same kernel plus the GFX1013 **amdgpu/KFD fixes** of linux-cachyos-bc250 (`patches/0008`-`0016`), which make GPU compute reliable: [KytyPS5-Native](#8-emulators) and [AI/LLM work](#9-ai-and-gpu-compute) (llama.cpp, ComfyUI, ROCm). Upstream's kernel stays on the boot partition as the `.bak` fallback |
+| **Kernel** | 7.3.5-pc8fe | **7.3.5-pc8fe-bc1**: the same kernel plus the GFX1013 **amdgpu/KFD fixes** of linux-cachyos-bc250 (`patches/0008`-`0016`), which make GPU compute reliable: [KytyPS5-Native](#8-emulators) and [AI/LLM work](#9-ai-and-gpu-compute) (llama.cpp, ComfyUI, ROCm). |
 | **Kernel command line** | | the BC-250's compute settings (`ttm.pages_limit`, `amdgpu.sched_policy=2`, `cwsr_enable=0`, `vm_update_mode=0`, `bc250_gfx_eop_events=2`) and zswap |
 | **Mesa** | Arch's | the BC-250 Mesa from `[bc250-cachyos]`: built for Zen 2, GFX1013 compute queue fix, FSR 4 support. Mesh shaders (DirectMesh) stay off on the PS5: they hang the PS5 Pro's GPU in Vulkan CTS |
 | **Swap** | zram | a swap file in its own subvolume (32 GB on a 128 GB+ drive) with zswap in front |
@@ -59,7 +59,7 @@ Everything upstream's image has is still in this one (Gaming Mode, HDR, FreeSync
 | **Fan** | quiet curve | a smoother curve: upstream's is so quiet up to 65 °C (PWM 5-31) that under load the fan jumps from nearly silent to loud every few seconds; this one starts higher (PWM 40 at 50 °C) and rises evenly |
 | **Internal M.2** | | `sudo ps5-install-m2` |
 | **Loader** | soniciso1's releases | the same loader built from his main branch with [PR #31](https://github.com/soniciso1/ps5-linux-loader/pull/31) (PS5 Pro pairing export), until he releases it ([the loader](#the-loader)) |
-| **Other** | | NTP clock sync on, `steam` in the `render` group, base-devel and git preinstalled, updates from this fork |
+| **Other** | | NTP clock sync on, `steam` in the `render` group, git preinstalled (gcc is installed when boost or the M.2 installer needs it), updates from this fork |
 
 **PS5 Pro Bluetooth** (internal adapter, DualSense, pairings from PS5 OS) works in both: those fixes were made here and are part of upstream's image too. The full list of files the build changes: [image/README.md](image/README.md).
 

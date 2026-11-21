@@ -8,7 +8,10 @@ set -Eeuo pipefail
 trap 'echo "ERROR line $LINENO: $BASH_COMMAND" >&2' ERR
 
 IMG_MB=${IMG_MB:-12000}
-OPTS=noatime,compress=zstd
+OPTS=noatime,compress=zstd   # in the image's fstab: what the PS5 writes later is compressed
+# While building, files go in uncompressed: the image is xz-compressed as a whole, and xz cannot shrink
+# zstd data (GitHub release files must stay under 2 GiB).
+BUILD_OPTS=noatime
 SUBVOLS="@ @home @root @srv @cache @log @tmp"
 N=/n
 
@@ -46,12 +49,12 @@ BL=$(loop /w/out.img "$bs" "$bz"); LOOPS+=("$BL")
 mkfs.vfat -n boot -F32 "$BL" >/dev/null
 mkfs.btrfs -q -L cachyos "$RL"
 
-mkdir -p "$N"; mount -o "$OPTS" "$RL" "$N"
+mkdir -p "$N"; mount -o "$BUILD_OPTS" "$RL" "$N"
 for s in $SUBVOLS; do btrfs -q subvolume create "$N/$s"; done
 umount "$N"
-mount -o "$OPTS,subvol=@" "$RL" "$N"
+mount -o "$BUILD_OPTS,subvol=@" "$RL" "$N"
 for m in home:@home root:@root srv:@srv var/cache:@cache var/log:@log var/tmp:@tmp; do
-	mkdir -p "$N/${m%%:*}"; mount -o "$OPTS,subvol=${m##*:}" "$RL" "$N/${m%%:*}"
+	mkdir -p "$N/${m%%:*}"; mount -o "$BUILD_OPTS,subvol=${m##*:}" "$RL" "$N/${m%%:*}"
 done
 btrfs -q subvolume create "$N/var/swap"; chattr +C "$N/var/swap"
 mkdir -p "$N/boot/efi"; mount "$BL" "$N/boot/efi"
@@ -121,7 +124,10 @@ mkdir -p /k; zstd -dc /w/kernel.tar.zst | tar -xf - -C /k
 KVER=$(cat /k/VERSION)
 cp -a "/k/usr/lib/modules/$KVER" "$N/usr/lib/modules/"
 chown -R 0:0 "$N/usr/lib/modules/$KVER"
-mv "$N/boot/efi/bzImage" "$N/boot/efi/bzImage.bak"; mv "$N/boot/efi/initrd.img" "$N/boot/efi/initrd.img.bak"
+# Upstream's kernel is not kept (release files must stay under 2 GiB, and its modules are already
+# compressed): the first kernel update keeps the previous kernel as .bak.
+for d in "$N"/usr/lib/modules/*; do [ "$(basename "$d")" = "$KVER" ] || rm -rf "$d"; done
+rm -f "$N/boot/efi/bzImage.bak" "$N/boot/efi/initrd.img.bak"
 cp /k/boot/bzImage "$N/boot/efi/bzImage"
 
 echo "== Packages (chroot)"
@@ -130,7 +136,7 @@ arch-chroot "$N" /bin/bash -euo pipefail -c '
 	pacman -Syu --noconfirm
 	# GPU compute (KFD /dev/kfd, render nodes) for the steam user, as on the BC-250.
 	usermod -aG render steam
-	pacman -S --noconfirm --needed btrfs-progs snapper btrfs-assistant compsize base-devel git rsync unzip
+	pacman -S --noconfirm --needed btrfs-progs snapper btrfs-assistant compsize git rsync unzip
 	pacman -Q mesa vulkan-radeon lib32-vulkan-radeon
 	# snapper: one config for / like the BC-250, snapshots before/after each pacman run (snap-pac).
 	snapper --no-dbus -c root create-config /
@@ -156,5 +162,9 @@ for d in "$N/var/cache" "$N/var/log" "$N/var/tmp" "$N/srv" "$N/root"; do bad+=$(
 [ -z "$bad" ] || { echo "files owned by a normal user:"; echo "$bad" | head -20; exit 1; }
 btrfs subvolume list "$N" | sed 's/^/  /'
 ls -la "$N/boot/efi"; df -h "$N" | tail -1
+# Free blocks still hold what the build deleted (old packages, the pacman cache): discard them so the
+# image file gets holes there, which compress to nothing (GitHub release files must stay under 2 GiB).
+fstrim -v "$N"
+fstrim -v "$N/boot/efi" || true
 echo "KVER=$KVER" > /w/out.env
 chown "$(stat -c %u:%g /w)" /w/out.img /w/out.env

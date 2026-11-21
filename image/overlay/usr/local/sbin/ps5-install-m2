@@ -40,7 +40,7 @@ findmnt -no SOURCE "$BOOT" >/dev/null || die "$BOOT is not mounted."
 	die "$BOOT is not on the USB SSD this system runs from."
 if lsblk -lno MOUNTPOINTS "$NVME" | grep -q .; then die "something on $NVME is mounted. Unmount it first."; fi
 grep -qw "LABEL=$LABEL" /proc/cmdline && die "the kernel already uses LABEL=$LABEL as root."
-for c in git cc rsync mkfs.btrfs btrfs partprobe; do command -v "$c" >/dev/null || die "$c is missing (sudo pacman -S --needed git base-devel rsync btrfs-progs parted)"; done
+for c in rsync mkfs.btrfs btrfs partprobe; do command -v "$c" >/dev/null || die "$c is missing (sudo pacman -S --needed rsync btrfs-progs parted)"; done
 
 size=$(lsblk -bndo SIZE "$NVME"); used=$(btrfs filesystem usage -b / 2>/dev/null | awk '/Used:/ { print $2; exit }')
 swap=$(stat -c %s /var/swap/swapfile 2>/dev/null || echo 0)   # not copied, made again on the M.2
@@ -54,6 +54,8 @@ read -r -p "Type ERASE to continue: " ok
 [ "$ok" = ERASE ] || die "nothing changed."
 
 work=$(mktemp -d); trap 'umount -R "$MNT" 2>/dev/null || true; rm -rf "$work"' EXIT
+command -v cc >/dev/null || pacman -S --noconfirm --needed gcc || die "could not install gcc (no internet?)"
+command -v git >/dev/null || pacman -S --noconfirm --needed git || die "could not install git (no internet?)"
 echo "== Building m2_init from $TOOLS"
 git clone -q --depth 1 "$TOOLS" "$work/tools" || die "could not download ps5-linux-tools (no internet?)"
 cc -Os -o "$work/m2_init" "$work/tools/m2_init.c" -lz || die "building m2_init failed"

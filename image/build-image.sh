@@ -49,5 +49,5 @@ docker run --rm --privileged --memory=20g \
 name=ps5-cachyos-$KVER-btrfs-$(date +%Y%m%d).img
 mv "$WORK/out.img" "$OUT/$name"
 echo "Compressing..."
-xz -T0 -6 -c "$OUT/$name" > "$OUT/$name.xz" && rm "$OUT/$name"
+xz -T0 -9e -c "$OUT/$name" > "$OUT/$name.xz" && rm "$OUT/$name"
 (cd "$OUT" && sha256sum "$name.xz" > "$name.xz.sha256" && ls -la "$name.xz")

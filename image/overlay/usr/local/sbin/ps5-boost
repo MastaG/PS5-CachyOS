@@ -24,7 +24,8 @@ esac
 
 if [ "$1" = on ]; then
 	if [ ! -x "$BIN" ]; then
-		for c in git cc make; do command -v "$c" >/dev/null || die "$c is missing (sudo pacman -S --needed git base-devel)"; done
+		command -v cc >/dev/null || pacman -S --noconfirm --needed gcc || die "could not install gcc (no internet?)"
+		command -v git >/dev/null || pacman -S --noconfirm --needed git || die "could not install git (no internet?)"
 		t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 		echo "Building ps5_control from $TOOLS ..."
 		git clone -q --depth 1 "$TOOLS" "$t/tools" || die "could not download ps5-linux-tools (no internet?)"
