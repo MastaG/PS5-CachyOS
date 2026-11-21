@@ -107,7 +107,7 @@ PS5EOF
 Type=Application
 Name=Update PS5 CachyOS
 Comment=Install the newest PS5 kernel, fixes, extras and system updates
-Exec=konsole --hide-menubar --hide-tabbar -p TerminalColumns=84 -p TerminalRows=24 -p ShowTerminalSizeHint=false -p "LocalTabTitleFormat=PS5 CachyOS Updater" -e $UBIN/ps5-update
+Exec=konsole --hide-menubar --hide-tabbar -p "LocalTabTitleFormat=PS5 CachyOS Updater" -e $UBIN/ps5-update
 Icon=system-software-update
 Terminal=false
 Categories=System;
