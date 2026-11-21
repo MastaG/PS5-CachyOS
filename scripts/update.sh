@@ -211,14 +211,17 @@ RESTART=0
 
 # 1. Kernel
 KFAIL=0
-new=$(curl -fsSL --max-time 30 "$R/update-kernel.sh" 2>/dev/null | sed -n 's/^KVER=//p' | head -1)
+ks=$(curl -fsSL --max-time 30 "$R/update-kernel.sh" 2>/dev/null)
+new=$(printf '%s\n' "$ks" | sed -n 's/^KVER=//p' | head -1)
+kdate=$(printf '%s\n' "$ks" | sed -n 's/^KDATE="\([^"]*\)".*/\1/p' | head -1)
+kd=${kdate:+, $kdate}   # ", 20 Nov 2026" when the repo says it
 if [ -n "$new" ] && [ "$new" != "$(uname -r)" ]; then busy "Kernel" "installing $new (1-3 min)"; else busy "Kernel" "checking"; fi
 kernel_step() { fetch update-kernel.sh | kernel_sh; }
 if run Kernel kernel_step; then
 	if out Kernel | grep -q '^Done: kernel'; then
-		ok "Kernel" "updated to $new"; RESTART=1
+		ok "Kernel" "updated to $new$kd"; RESTART=1
 	elif out Kernel | grep -q 'already on the newest kernel'; then
-		ok "Kernel" "up to date ($(uname -r))"
+		if [ "$(uname -r)" = "$new" ]; then ok "Kernel" "up to date ($new$kd)"; else ok "Kernel" "up to date ($(uname -r))"; fi
 	else
 		ok "Kernel" "done"
 	fi
