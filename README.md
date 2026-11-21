@@ -131,6 +131,7 @@ It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam
 | 1080p @ 60 / 120 / 144 Hz | ✅ (144 Hz needs a monitor that offers it) |
 | 1440p @ 60 / 120 / 144 Hz | ✅ |
 | 2160p @ 60 Hz | ✅ |
+| 75 Hz and other monitor modes (e.g. 1080p @ 75 Hz) | ✅ with kernel 7.3.5-pc8fe or newer |
 | 2160p @ 120 Hz | Needs an HDMI 2.1 TV (untested) |
 
 **FreeSync / VRR** works at **60 and 120 Hz**, not at 144 Hz (the PS5's HDMI chip doesn't do variable refresh there). First turn on **Adaptive-Sync / FreeSync** in the monitor's own menu. For fast games that already run above 144 fps (CS2, for example), fixed 144 Hz usually feels better.
