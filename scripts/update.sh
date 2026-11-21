@@ -101,6 +101,19 @@ notify-send -a "PS5 CachyOS" -i system-software-update "PS5 CachyOS update avail
 	"Kernel $new is out (you have $cur). Open \"Update PS5 CachyOS\" on the desktop." && echo "$new" > "$seen"
 PS5EOF
 	chmod 755 "$UBIN/ps5-update" "$UBIN/ps5-update-check"
+	# Breeze's update icon, framed tighter so it's as big as the other desktop icons
+	mkdir -p "$HOME/.local/share/icons"
+	cat > "$HOME/.local/share/icons/ps5-update-circle.svg" <<'PS5EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="svg7" version="1.1" viewBox="3 3 18 18" width="24" height="24">
+  <defs id="defs3">
+    <style type="text/css" id="current-color-scheme">.ColorScheme-Text { color: #fcfcfc; } </style>
+  </defs>
+  <g transform="translate(1,1)">
+    <path id="path842" d="m11 3a8 8 0 0 0-8 8h1a7 7 0 0 1 7-7 7 7 0 0 1 7 7 7 7 0 0 1-7 7 7 7 0 0 1-6.3105469-4h2.3105469v-1h-2.6972656-1.0332032-0.2695312v1 3h1v-2.195312a8 8 0 0 0 7 4.195312 8 8 0 0 0 8-8 8 8 0 0 0-8-8zm0 3-4 4h2v5h4v-5h2l-4-4z" class="ColorScheme-Text" fill="currentColor" stroke-linecap="round" style="paint-order:markers fill stroke"/>
+  </g>
+</svg>
+PS5EOF
 	for f in "$DESK/ps5-update.desktop" "$APPS/ps5-update.desktop"; do
 		cat > "$f" <<PS5EOF
 [Desktop Entry]
@@ -108,7 +121,7 @@ Type=Application
 Name=Update PS5 CachyOS
 Comment=Install the newest PS5 kernel, fixes, extras and system updates
 Exec=konsole --hide-menubar --hide-tabbar -p "LocalTabTitleFormat=PS5 CachyOS Updater" -e $UBIN/ps5-update
-Icon=system-software-update
+Icon=$HOME/.local/share/icons/ps5-update-circle.svg
 Terminal=false
 Categories=System;
 PS5EOF
@@ -140,7 +153,8 @@ PS5EOF
 remove_updater() {
 	systemctl --user disable --now ps5-update-check.timer >/dev/null 2>&1
 	rm -f "$UNIT/ps5-update-check.service" "$UNIT/ps5-update-check.timer" "$UBIN/ps5-update" "$UBIN/ps5-update-check" \
-		"$DESK/ps5-update.desktop" "$APPS/ps5-update.desktop" "$HOME/.cache/ps5-update-notified"
+		"$DESK/ps5-update.desktop" "$APPS/ps5-update.desktop" "$HOME/.cache/ps5-update-notified" \
+		"$HOME/.local/share/icons/ps5-update-circle.svg"
 	systemctl --user daemon-reload 2>/dev/null
 	echo "Removed the updater icon and the daily check."
 }
