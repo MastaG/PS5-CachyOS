@@ -57,7 +57,7 @@ key() {
 	case "$k" in '\n'|'\r') echo enter ;; 033) [ -z "$more" ] && echo esc || echo other ;; *) echo "$k" ;; esac
 }
 ask() { # ask "question" default(y|n, used only without a keyboard)
-	printf '%s  %s?%s %s\n    %sEnter = continue    Esc = abort%s' "$CL" "$YEL" "$OFF" "$1" "$DIM" "$OFF"
+	printf '%s  %s?%s %s\n\n    %sEnter = continue    Esc = abort%s' "$CL" "$YEL" "$OFF" "$1" "$DIM" "$OFF"
 	while :; do
 		case $(key) in
 		enter|y|Y) a=0; break ;;
@@ -66,7 +66,7 @@ ask() { # ask "question" default(y|n, used only without a keyboard)
 		esac
 	done
 	# remove the question again; the step's result line takes its place
-	if [ -n "$CL" ]; then printf '\r\033[K\033[1A\r\033[K'; else echo; fi
+	if [ -n "$CL" ]; then printf '\r\033[K\033[1A\r\033[K\033[1A\r\033[K'; else echo; fi
 	return $a
 }
 # ?t=<time>: skip GitHub's 5-minute cache, so a fix is used right after it's pushed
