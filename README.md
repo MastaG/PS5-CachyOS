@@ -9,7 +9,7 @@
 
 ![KDE "About this System" on the PS5: kernel 7.3.5-pc8fe, KDE Plasma 6.8.3 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 13.7 GiB RAM](images/about-this-system-pc8fe.png)
 
-**Tested on** a PS5 launch model Digital Edition (CFI-1016B), firmware 13.60, [soniciso1's ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases), a 1 TB USB-C SSD, a 1440p 144 Hz monitor and a 4K 60 Hz TV. The image is built on the official [ps5-linux CachyOS image](https://github.com/ps5-linux/ps5-linux-image), see [Credits](#credits).
+**Tested on** a PS5 launch model Digital Edition (CFI-1016B), firmware 13.60, [ps5-linux-loader](https://github.com/ps5-linux/ps5-linux-loader) (build `badfe48`, attached to the [latest release](https://github.com/abrocoma/PS5-CachyOS/releases/latest)), a 1 TB USB-C SSD, a 1440p 144 Hz monitor and a 4K 60 Hz TV. The image is built on the official [ps5-linux CachyOS image](https://github.com/ps5-linux/ps5-linux-image), see [Credits](#credits).
 
 > [!IMPORTANT]
 > **Rebooting Linux takes you back to PS5 OS.** To get into Linux again, run the exploit and the loader again.
@@ -33,7 +33,7 @@
 
 Linux runs entirely from an external SSD. Nothing is installed on the PS5's internal storage.
 
-**You need:** a jailbroken PS5 with a Linux loader ([soniciso1's ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases), pick the release for your firmware) and a USB 3 SSD.
+**You need:** a jailbroken PS5 with the Linux loader ([ps5-linux-loader](https://github.com/ps5-linux/ps5-linux-loader): its v2.5 release only supports firmware up to 7.61, so for 10.xx-13.60 use `ps5-linux-loader-badfe48.elf` from the [latest release](https://github.com/abrocoma/PS5-CachyOS/releases/latest)) and a USB 3 SSD.
 
 > [!TIP]
 > **No PC? Flash it from the PS5 itself** with [Linux Flasher](https://github.com/abrocoma/PS5-Linux-Flasher/releases/latest): a payload that downloads this image, writes it to the SSD and checks it. Then skip to [step 2](#2-boot-into-linux). With a PC, follow the steps below.
@@ -239,10 +239,10 @@ Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 sec
 
 ## Credits
 
-- **[soniciso1/ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases)**: Linux loader with 13.60 support
+- **[ps5-linux/ps5-linux-loader](https://github.com/ps5-linux/ps5-linux-loader)**: the Linux loader (firmware 3.00-13.60, PS5 Phat, Slim and Pro)
 - **[ps5-linux](https://github.com/ps5-linux)**: [image](https://github.com/ps5-linux/ps5-linux-image) this guide's image is built on, [kernel patches](https://github.com/ps5-linux/ps5-linux-patches), [Wi-Fi driver](https://github.com/ps5-linux/ps5-linux-mwifiex), [tools](https://github.com/ps5-linux/ps5-linux-tools)
 - **[QuartConz/ps5-pro-viola-bluetooth](https://github.com/QuartConz/ps5-pro-viola-bluetooth)** and **[WizGery/ps5-mediatek-fixes](https://github.com/WizGery/ps5-mediatek-fixes)**: PS5 Pro Bluetooth driver work
-- **[MastaG](https://github.com/MastaG)**: PS5 Pro Bluetooth port and testing ([#7](https://github.com/abrocoma/PS5-CachyOS/pull/7)), faster DualSense reconnects, the loader merge with pairing export ([soniciso1 #31](https://github.com/soniciso1/ps5-linux-loader/pull/31))
+- **[MastaG](https://github.com/MastaG)**: PS5 Pro Bluetooth port and testing ([#7](https://github.com/abrocoma/PS5-CachyOS/pull/7)), faster DualSense reconnects
 - **Slip-Up**: pairing export in the loader ([ps5-linux-loader #97](https://github.com/ps5-linux/ps5-linux-loader/pull/97))
 - **kadhtobi** and everyone who tested and reported issues, especially on the PS5 Pro and Slim
 
