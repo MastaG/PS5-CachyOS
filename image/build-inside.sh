@@ -73,11 +73,13 @@ echo "== fstab, cmdline.txt, pacman.conf, initrd modules"
 } > "$N/etc/fstab"
 cat "$N/etc/fstab"
 
-# Same line as the base image, plus btrfs root, the GFX1013 compute params (as on the BC-250) and zswap.
+# Same line as the base image, plus btrfs root, the GFX1013 compute params (as on the BC-250), zswap, and
+# kho=off (KHO's 1.5 GB CMA scratch back) with the udmabuf limit of the Flash Next engine (docs/AI.md).
 cmd=$(tr -d '\n' < /srcboot/cmdline.txt)
 cmd="${cmd/ rw / rw rootflags=subvol=@ }"
 for p in ttm.pages_limit=3670016 amdgpu.sched_policy=2 amdgpu.vm_update_mode=0 amdgpu.cwsr_enable=0 \
-	amdgpu.bc250_gfx_eop_events=2 zswap.enabled=1 zswap.max_pool_percent=25 zswap.compressor=zstd; do
+	amdgpu.bc250_gfx_eop_events=2 zswap.enabled=1 zswap.max_pool_percent=25 zswap.compressor=zstd \
+	kho=off udmabuf.size_limit_mb=16384; do
 	case " $cmd " in *" ${p%%=*}="*) ;; *) cmd="$cmd $p" ;; esac
 done
 printf '%s\n' "$cmd" > "$N/boot/efi/cmdline.txt"; cat "$N/boot/efi/cmdline.txt"

@@ -3,7 +3,7 @@
 > [!NOTE]
 > Copied from the linux-cachyos-bc250 repository (`bfb1d54b`), where the kernel patches, Mesa and PyTorch
 > packages for the BC-250 board's GPU are made. The PS5 has the same GPU family (GFX1013), and this
-> image ships those patches and that Mesa. **Every number here is a BC-250 measurement (that board, 40 CUs unlocked, its own clocks and memory), except in [Inkling-2-Mini](#llm-inkling-2-mini), which was measured on a PS5 Pro as well.**
+> image ships those patches and that Mesa. **Every number here is a BC-250 measurement (that board, 40 CUs unlocked, its own clocks and memory), except in [Inkling-2-Mini](#llm-inkling-2-mini), which was measured on a PS5 Pro as well, and [Qwen3.8-Flash-Next](#llm-qwen38-flash-next-ps5-pro), measured on a PS5 Pro only.**
 
 The measurements behind the setups in [AI.md](AI.md): one board, 2026-11-14,
 CachyOS with a kernel from this repository, all 40 CUs unlocked
@@ -278,6 +278,52 @@ started, one short request, then `MemAvailable`:
 
 Generation is the same at every micro-batch (about 45 t/s on the BC-250 in these server runs). Not measured
 yet: a filled context, and the vision part (`mmproj`).
+
+## LLM: Qwen3.8-Flash-Next (PS5 Pro)
+
+Qwen3.8-Flash-Next (125B mixture-of-experts) with LaRazaDelSol's
+[AIEngineOnSmallUniMem](https://github.com/LaRazaDelSol/AIEngineOnSmallUniMem) (`bf7d21c`), which keeps the dense
+part in memory (2.7 GB) and reads the experts from the drive into a 10-10.5 GiB cache. PS5 Pro, PS5-CachyOS
+`7.3.5-pc8fe-bc1`, internal M.2 (Viper VP4300 2 TB, 4.1 GB/s measured while reading experts), 36 CUs (the
+engine's 40-CU unlock and low-memory tier need kernel patches of its own, not in this kernel), 2026-11-22. Setup:
+[AI.md](AI.md#biggest-model-qwen38-flash-next-ps5-only).
+
+**`kho=off` is needed.** Without it (this kernel has `CONFIG_KEXEC_HANDOVER_ENABLE_DEFAULT=y`) the kernel keeps
+1.5 GB as CMA scratch for a kexec'd kernel. The engine's pinned pool can't use it: the smoke test was OOM-killed
+with 1.36 GB still free, all of it that scratch (`free_cma:1358736kB`), and loading the weights took 290 s instead
+of 3 s under the memory pressure. With `kho=off` the same test passes.
+
+CLI (`flash_decode`), each run cold (page cache dropped), Gaming Mode's Steam stopped, the engine's served
+options (`--spec 3 --pld 4 --kv k4v4 --prefill-chunk 8192 --wide-slice 512 --route-mtp 1`), the C++ LRU-cache
+reference prompt (56 tokens), 300 tokens written:
+
+| Experts | Routing | Writing | Expert cache hits | Note |
+|---|---|---:|---:|---|
+| 3.18 bpw | cache-aware (`--route-bias 1 --prefetch-max 4 --route-pf`) | 39.8 t/s | 92.4% | the served setup |
+| 3.18 bpw | exact | 22.4 t/s | 85.0% | |
+| 2.68 bpw | cache-aware | 48.2 t/s | 93.8% | |
+| 2.68 bpw | exact | 28.5 t/s | 86.6% | `--pool-gib 10.25` |
+| 2.68 bpw | exact, `--spec 1` (the smoke test) | 28.2 t/s | 87.5% | output identical to the author's reference (`18179c0e1f51`) |
+
+The author's numbers for comparison (their console, 40 CUs, their kernel): 56.2 t/s for the first row, 45.5 with
+exact routing.
+
+**Prompt reading:** 11,043 tokens (docs text plus a question), 3.18 bpw, cache-aware: **357.6 t/s** (30.9 s),
+then 27.6 t/s writing the summary. The answer summarized the text correctly.
+
+**Server** (`ps5lm_server.py`, the `flash-next` service from AI.md, Gaming Mode stopped, `--pool-gib 10.25
+--max-ctx 65536`, thinking off, `temperature` 0): 21-35 t/s on the first short answers, then **40-44 t/s** on
+four 400-600-token answers (expert cache hits 93%). 1.0-1.3 GB of memory left while it runs.
+
+What didn't work:
+
+- `--pool-gib auto` (the default) takes what is free, 10.6-11 GiB here. At 10.9 GiB and more the run failed at
+  its first GPU submission with `Not enough memory for command submission` (the 14 GiB GPU limit,
+  `ttm.pages_limit=3670016`), even with the 56-token prompt. 10.25 GiB works, also for the 11k-token prompt.
+- The model's current chat template has `{% generation %}` tags the engine's server can't parse (it stops at
+  start); removing those two lines doesn't change the prompt.
+- `pack_exl3.py` doesn't write `experts_exl3.txt`, which `pack_exl3_mtp.py` and the engine need; AI.md makes it
+  from the pack's `.json`.
 
 ## Images: SDXL in ComfyUI
 

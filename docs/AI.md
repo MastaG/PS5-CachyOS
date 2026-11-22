@@ -3,13 +3,14 @@
 > [!NOTE]
 > Copied from the linux-cachyos-bc250 repository (`bfb1d54b`), where the kernel patches, Mesa and PyTorch
 > packages for the BC-250 board's GPU are made. The PS5 has the same GPU family (GFX1013), and this
-> image ships those patches and that Mesa. **Its numbers are measured on a BC-250, not on a PS5 (except [Inkling-2-Mini](#faster-chat-inkling-2-mini), measured on a PS5 Pro): the PS5's clocks, CU count and memory differ, so take them as a starting point. Where the BC-250 needs something different from the PS5, this copy says what to do on the PS5.**
+> image ships those patches and that Mesa. **Its numbers are measured on a BC-250, not on a PS5 (except [Inkling-2-Mini](#faster-chat-inkling-2-mini) and [Qwen3.8-Flash-Next](#biggest-model-qwen38-flash-next-ps5-only), measured on a PS5 Pro): the PS5's clocks, CU count and memory differ, so take them as a starting point. Where the BC-250 needs something different from the PS5, this copy says what to do on the PS5.**
 
-Two setups, both the fastest we measured on the board
+The setups, each the fastest we measured on the board
 ([numbers and what else we tried](AI-BENCHMARKS.md)):
 
 - **Chat (LLM):** Qwen3.8-27B with llama.cpp: about 27 tokens/s (31 on code), 32k context.
 - **Faster chat (LLM):** Inkling-2-Mini with a llama.cpp fork: about 47 tokens/s, 32k context (59 tokens/s on a PS5 Pro).
+- **Biggest model (PS5 only):** Qwen3.8-Flash-Next, 125B, streamed from the internal M.2: about 42 tokens/s on a PS5 Pro.
 - **Images:** ComfyUI with SDXL-Lightning: a 1024×1024 image in about 20 s.
 
 Each needs most of the board's memory, so run one at a time.
@@ -213,6 +214,159 @@ only changes how fast prompts are read: writing stays at about 59 tokens/s.
   (`plasma-welcome`) for memory before llama-server gave up.
 
 - It thinks before it answers by default, so give API requests room (`max_tokens` 1000+).
+- Like any local model it can state wrong facts with confidence. Check what matters.
+
+## Biggest model: Qwen3.8-Flash-Next (PS5 only)
+
+[Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) is a 125B mixture-of-experts model: far
+bigger than the memory, so it can't run with llama.cpp here. LaRazaDelSol's
+[AIEngineOnSmallUniMem](https://github.com/LaRazaDelSol/AIEngineOnSmallUniMem) is an engine written for the PS5:
+the small always-used part of the model (2.7 GB) stays in memory, and the experts each token needs are read from
+the internal M.2 drive as it goes, with a 10 GB cache of the ones used most. On a PS5 Pro: **40-44 tokens/s
+writing** once its cache is warm (20-35 on the first answers) and **about 360 tokens/s reading** a long prompt.
+Measured on this image: [benchmarks](AI-BENCHMARKS.md#llm-qwen38-flash-next-ps5-pro).
+
+What it needs:
+
+- **The internal M.2 drive** with about **350 GB free** while it is set up (about 200 GB stays used). The setup downloads
+  about 470 GB, most of it deleted again as it goes. A USB drive is too slow.
+- **`kho=off udmabuf.size_limit_mb=16384`** in the boot options. New images have them; on an older install the
+  [updater](../README.md#5-updating) adds them (or add them to the end of the single line in
+  `/boot/efi/cmdline.txt`), then restart. Without `kho=off` the kernel keeps 1.5 GB aside that the engine can't
+  use, and it runs out of memory at start (measured). Check with `grep -o kho=off /proc/cmdline`.
+- **A few hours** for the download and conversion. Everything below runs as your normal user over SSH, except
+  where it says `sudo`.
+
+### 1. Build the engine
+
+```bash
+sudo pacman -S --needed cmake ninja git vulkan-headers glslang shaderc \
+    python-tokenizers python-jinja python-huggingface-hub
+mkdir -p ~/ps5lm && git clone https://github.com/LaRazaDelSol/AIEngineOnSmallUniMem.git ~/ps5lm/src
+cd ~/ps5lm/src && git checkout bf7d21c          # the version measured here
+cmake -S runtime -B ~/ps5lm/build14 -G Ninja -DCMAKE_BUILD_TYPE=Release -DPS5LM_BUILD_BENCH=OFF
+cmake --build ~/ps5lm/build14 --target flash_decode ps5lm_shaders pack_convert
+```
+
+Skip the engine's own "boot modes" step (`ps5lm-min`): it needs kernel patches of its own and restarts that the
+PS5 loader doesn't do. The service in step 3 does the same job here.
+
+### 2. Download and convert the model
+
+Run these one after the other, each in a unit of its own, so they keep going when you log out. Each one can be
+started again if it stops: it continues where it was.
+
+```bash
+M=~/ps5lm/model; mkdir -p $M; cd ~/ps5lm/src/runtime/tools
+
+# tokenizer, chat template, config and shard list of the original model
+hf download Qwen/Qwen3.8-Flash-Next tokenizer.json tokenizer_config.json chat_template.jinja config.json \
+    model.safetensors.index.json --local-dir $M
+cp $M/model.safetensors.index.json $M/index.json      # the converter looks for this name
+
+# the original weights (131 parts, 360 GB, each deleted once converted): about an hour after the download
+systemd-run --user --unit=fn-convert -d python3 convert_hf.py --out $M --bin ~/ps5lm/build14/pack_convert
+journalctl --user -u fn-convert -f                   # "ALL DONE" at the end (Ctrl+C stops watching only)
+
+# the experts in 3.18 bits (EXL3, 106 GB), packed for the engine
+systemd-run --user --unit=fn-exl3 -d sh -c "hf download turboderp/Qwen3.8-Flash-Next-exl3 \
+    --revision 3.18bpw_h6_ng8 --local-dir ~/ps5lm/dl && python3 s15/pack_exl3.py ~/ps5lm/dl $M --delete-shards"
+journalctl --user -u fn-exl3 -f                      # "done" at the end
+```
+
+`pack_exl3.py` (at `bf7d21c`) doesn't write the small index the next step and the engine read
+(`experts_exl3.txt`). Make it from the pack's `.json`, then add the MTP layer (used to guess several tokens at once):
+
+```bash
+python3 - <<'PY'
+import json, os
+D = os.path.expanduser("~/ps5lm/model"); m = json.load(open(D + "/experts_exl3.json"))
+with open(D + "/experts_exl3.txt", "w") as f:
+    f.write("# layer K2 slot_bytes base span_bytes\n")
+    for l in range(len(m["base"])):
+        f.write(f"{l} {round(2 * m['K'][l])} {m['slot_bytes'][l]} {m['base'][l]} {m['span_bytes'][l]}\n")
+PY
+python3 s15/pack_exl3_mtp.py $M
+```
+
+The model's chat template now carries `{% generation %}` markers (only used for training): the engine's server
+stops at them. Remove those two lines (the original stays as `.orig`):
+
+```bash
+cp -n $M/chat_template.jinja $M/chat_template.jinja.orig
+sed -i -E '/^[[:space:]]*\{%-?[[:space:]]*(end)?generation[[:space:]]*-?%\}[[:space:]]*$/d' $M/chat_template.jinja
+```
+
+**Optional, a self-test:** the 2.68-bit experts (40 GB more, read straight from Hugging Face, about 8 minutes)
+and the engine's smoke test, which checks that it writes exactly the author's reference answer:
+
+```bash
+python3 s17/fetch_pack_exl3.py 2.68bpw_h6_ng8 $M experts_exl3_268
+python3 s15/pack_exl3_mtp.py $M experts_exl3_268 --nonexpert $M/exl3_nonexpert.safetensors
+sudo systemctl stop getty@tty1                       # Gaming Mode off (memory)
+sudo env HOME=$HOME bash ~/ps5lm/src/scripts/console/smoke.sh
+sudo systemctl start getty@tty1                      # Gaming Mode back
+```
+
+It should end with `PASS` (on this image: `md5 18179c0e1f51 PASS`, 28 tokens/s on a cold start).
+
+**Cleanup:** the converter also writes two packs of a simpler format that the setup here doesn't use (103 GB):
+
+```bash
+rm ~/ps5lm/model/experts_q4.pack ~/ps5lm/model/experts_q2.pack
+```
+
+### 3. The server
+
+A system service (the engine runs as root: it reserves huge pages and locks its memory). Starting it stops
+Gaming Mode, stopping it brings Gaming Mode back. If your user isn't `steam`, change `U=`:
+
+```bash
+sudo tee /etc/systemd/system/flash-next.service >/dev/null <<'EOF2'
+[Unit]
+Description=Qwen3.8-Flash-Next (AIEngineOnSmallUniMem), OpenAI API on port 8081
+# Starting it stops Gaming Mode (the model needs nearly all memory); stopping it brings Gaming Mode back.
+Conflicts=getty@tty1.service
+After=getty@tty1.service network-online.target
+
+[Service]
+Environment=U=/home/steam
+ExecStart=/usr/bin/python3 ${U}/ps5lm/src/runtime/tools/ps5lm_server.py --model ${U}/ps5lm/model \
+    --bin ${U}/ps5lm/build14/flash_decode --shaders ${U}/ps5lm/build14/shaders --bits 3 --port 8081 \
+    --pool-gib 10.25 --max-ctx 65536 --spec 3 --pld 4 --kv k4v4 --kv-base 8192 --prefill-chunk 8192 \
+    --wide-slice 512 --route-mtp 1 --route-bias 1 --prefetch-max 4 --route-pf --pool-reserve-mib 256 \
+    --kv-store ${U}/ps5lm/sessions
+ExecStopPost=-/usr/bin/systemctl --no-block start getty@tty1.service
+KillMode=mixed
+TimeoutStopSec=60
+OOMScoreAdjust=1000
+EOF2
+sudo systemctl daemon-reload
+sudo systemctl start flash-next          # ready after about a minute
+sudo systemctl stop flash-next           # back to Gaming Mode
+```
+
+Don't `enable` it: it would stop Gaming Mode at every start. Try it:
+
+```bash
+curl http://<ps5-ip>:8081/v1/chat/completions -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"What is the capital of Australia?"}],"max_tokens":200}'
+```
+
+Any program that speaks the OpenAI API works with `http://<ps5-ip>:8081/v1` (the engine's own chat page isn't
+set up here).
+
+- **`--pool-gib 10.25`:** the engine's `auto` takes nearly all free memory, and then it can fail with
+  `Not enough memory for command submission`: the GPU can map at most 14 GB here (`ttm.pages_limit=3670016`),
+  for everything together. 10.25 leaves room for an 11k-token prompt (measured).
+- **`--max-ctx 65536`:** what was tried here; the engine can go to 262144 and grows the memory for it as the
+  conversation does, taken from the expert cache (slower).
+- **`--route-bias 1 --route-pf`** (and `--prefetch-max 4`) make it prefer experts that are already in memory: the
+  answers change a little, and it writes 1.8x as fast (measured: 39.8 vs 22.4 tokens/s on a cold start).
+  Remove those three for the model's exact choice of experts.
+- Conversations are kept on the drive (`~/ps5lm/sessions`, up to 16 GB): a follow-up question doesn't read the
+  whole conversation again, even after a restart.
+- It thinks before it answers by default; `"chat_template_kwargs": {"enable_thinking": false}` turns that off.
 - Like any local model it can state wrong facts with confidence. Check what matters.
 
 ## Images: ComfyUI with SDXL-Lightning

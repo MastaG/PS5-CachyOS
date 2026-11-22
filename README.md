@@ -180,7 +180,7 @@ curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/upd
 
 ![The PS5 CachyOS Updater: console info at the top, one line per step, all done in 1 min 21 s](images/updater-pc8fe.png)
 
-It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam extras**, **FreeSync and 1080p 144 Hz** (asks), the **fan curve** (asks, default no), the **update icon** with a daily check for new kernels, and finally **all system packages and Flatpak apps** (asks). Restart afterwards if the kernel changed.
+It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam extras**, **FreeSync and 1080p 144 Hz** (asks), **`kho=off`** in the boot options (1.5 GB more usable memory, see [AI](docs/AI.md#biggest-model-qwen38-flash-next-ps5-only)), the **fan curve** (asks, default no), the **update icon** with a daily check for new kernels, and finally **all system packages and Flatpak apps** (asks). Restart afterwards if the kernel changed.
 
 **Undo:** the same line with `| sh -s -- --rollback` at the end. Package updates can't be undone.
 
@@ -311,12 +311,13 @@ The kernel carries the GFX1013 compute (KFD) fixes made for the BC-250 board (sa
 - **[ROCm / KFD support](docs/ROCM.md)**: why the patches are needed, ROCm and the `bc250-pytorch` package (from the `[bc250-cachyos]` repo the image already has).
 - **[AI benchmarks](docs/AI-BENCHMARKS.md)**: what was measured on the BC-250, and what else was tried.
 - **Measured on the PS5 Pro:** [Inkling-2-Mini](docs/AI.md#faster-chat-inkling-2-mini), a 26B mixture-of-experts model, reads prompts at 686 tokens/s and writes 59 tokens/s with a llama.cpp fork (Vulkan).
+- **PS5 only:** [Qwen3.8-Flash-Next](docs/AI.md#biggest-model-qwen38-flash-next-ps5-only), a 125B mixture-of-experts model, far bigger than the memory: LaRazaDelSol's AIEngineOnSmallUniMem reads its experts from the internal M.2 as it goes. 40-44 tokens/s writing and about 360 tokens/s reading a prompt on a PS5 Pro.
 
 What's different on the PS5:
 
 - **Kernel parameters:** `ttm.pages_limit=3670016` and `amdgpu.sched_policy=2` are already in this image's `cmdline.txt`. The `steam` user is in the `render` group (`/dev/kfd`).
 - **No CU unlock:** `amdgpu.bc250_cc_write_mode` / `bc250_cc_wgp_mask` are BC-250 only and not in this kernel.
-- **Numbers:** the guide's benchmarks are BC-250 measurements (Inkling-2-Mini was measured on the PS5 Pro too); the PS5's clocks, CU count and memory differ ([boost](#7-extras-boost-fan-and-video) helps). The PS5 Pro gives Linux about 15 GiB of memory, shared by the CPU and GPU, so the guide's "one at a time" applies here too: stop Gaming Mode before loading a big model ([how](docs/AI.md#before-you-start-server-mode)).
+- **Numbers:** the guide's benchmarks are BC-250 measurements (Inkling-2-Mini and Qwen3.8-Flash-Next were measured on the PS5 Pro); the PS5's clocks, CU count and memory differ ([boost](#7-extras-boost-fan-and-video) helps). The PS5 Pro gives Linux about 15 GiB of memory, shared by the CPU and GPU, so the guide's "one at a time" applies here too: stop Gaming Mode before loading a big model ([how](docs/AI.md#before-you-start-server-mode)).
 
 ## 10. Installing to the internal M.2
 

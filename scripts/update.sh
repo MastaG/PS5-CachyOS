@@ -11,7 +11,9 @@
 #   3. update-extras.sh   Gaming Mode launcher (refresh rate in Steam, HDR on PS5 Fat/Pro, no Steam
 #                         update loop, performance overlay), desktop Steam -steamos3 override,
 #                         16-thread shader pre-caching, "12-bit Colour" icon
-#   4. FreeSync + 1080p 144 Hz boot options (asks first)
+#   4. FreeSync + 1080p 144 Hz boot options (asks first), and kho=off udmabuf.size_limit_mb=16384:
+#      KHO's 1.5 GB scratch area (memory for a kexec'd kernel, which the PS5 loader never does) is
+#      given back, and the Flash Next engine can map its expert pool (docs/AI.md)
 #   5. quiet-fan.sh       quieter fan curve + SoC Temp in the panel (asks first, default no)
 #   6. Updater:           "Update PS5 CachyOS" icon (runs this script) + a daily check that
 #                         shows a notification when a newer kernel is out
@@ -23,6 +25,7 @@ R=https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts
 BOOT=${PS5_BOOT:-/boot/efi}
 CMD="$BOOT/cmdline.txt"
 OPTS="hdmi.vrr=1 hdmi.extended_tmds=1"
+MEMOPTS="kho=off udmabuf.size_limit_mb=16384"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 say() { printf '\n== %s\n' "$*"; }
@@ -266,6 +269,7 @@ mkdir -p "$HOME/.cache"
 echo "PS5 CachyOS update, $(date)" > "$LOG"
 echo
 RESTART=0
+CMDBAK=0
 
 # 1. Kernel
 KFAIL=0
@@ -319,12 +323,28 @@ elif [ ! -f "$CMD" ]; then
 	skip "FreeSync, 144 Hz" "$CMD not found"
 elif ask "Turn on FreeSync (VRR) and 1080p 144 Hz? Safe to leave on." y; then
 	if sudo cp "$CMD" "$CMD.bak-update" && sudo sed -i "1s/[[:space:]]*\$/ $OPTS/" "$CMD"; then
-		ok "FreeSync, 144 Hz" "turned on"; RESTART=1
+		ok "FreeSync, 144 Hz" "turned on"; RESTART=1; CMDBAK=1
 	else
 		bad "FreeSync, 144 Hz" "couldn't change $CMD"
 	fi
 else
 	skip "FreeSync, 144 Hz" "aborted (stays off)"
+fi
+
+# 4b. Memory: kho=off (KHO keeps 1.5 GB as CMA scratch that pinned and GPU memory can't use) and a udmabuf
+# limit the Flash Next engine needs. Nothing to ask: the PS5 loader never hands over to a kexec'd kernel.
+if grep -q 'kho=off' "$CMD" 2>/dev/null; then
+	ok "Memory (kho=off)" "on"
+elif [ ! -f "$CMD" ]; then
+	skip "Memory (kho=off)" "$CMD not found"
+else
+	add=""
+	for p in $MEMOPTS; do grep -q "${p%%=*}=" "$CMD" || add="$add $p"; done
+	if { [ "$CMDBAK" = 1 ] || sudo cp "$CMD" "$CMD.bak-update"; } && sudo sed -i "1s/[[:space:]]*\$/$add/" "$CMD"; then
+		ok "Memory (kho=off)" "1.5 GB more usable memory"; RESTART=1
+	else
+		bad "Memory (kho=off)" "couldn't change $CMD"
+	fi
 fi
 
 # 5. Quiet fan curve (optional)
