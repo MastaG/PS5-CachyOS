@@ -3,6 +3,8 @@
 #
 # Update:    curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh
 # Roll back: curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --rollback
+# Headers:   curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --headers
+#            (kernel headers for DKMS drivers such as xone; installed again with every later kernel update)
 #
 # Installs the kernel (bzImage), its modules (incl. the Wi-Fi driver) and builds a
 # new initrd. The current kernel + initrd are kept as bzImage.bak / initrd.img.bak
@@ -12,9 +14,16 @@
 set -eu
 
 KVER=7.3.5-pc8fe-bc1
+KDATE="21 Nov 2026"   # release date, shown by the updater
 PKG=ps5-kernel-$KVER.tar.zst
 URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/kernel}
 BOOT=${PS5_BOOT:-/boot/efi}
+HDR_PKG=ps5-kernel-headers-$KVER.tar.zst
+HDR_URL=${PS5_HEADERS_URL:-https://github.com/MastaG/PS5-CachyOS/releases/download/image-2026-11-21}   # release that has the headers for $KVER
+# Headers: asked for, or installed before (then every kernel update brings new ones).
+WANT_HDR=0
+case " $* " in *" --headers "*) WANT_HDR=1 ;; esac
+ls -d /usr/src/linux-headers-*-p* >/dev/null 2>&1 && WANT_HDR=1
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -81,9 +90,37 @@ if [ "${1:-}" = "--rollback" ]; then
 	exit 0
 fi
 
-FORCE=0; [ "${1:-}" = "--force" ] && FORCE=1
+# Kernel headers for $KVER: /usr/src/linux-headers-$KVER, linked as /usr/lib/modules/$KVER/build,
+# then DKMS builds its drivers for $KVER. Never fatal: the kernel itself works without them.
+install_headers() {
+	command -v zstd >/dev/null || { echo "Headers skipped: 'zstd' is missing (sudo pacman -S zstd)."; return 0; }
+	h=$(mktemp -d /var/tmp/ps5-headers.XXXXXX)
+	echo "Downloading kernel headers $KVER..."
+	if curl -fL --progress-bar -o "$h/$HDR_PKG" "$HDR_URL/$HDR_PKG" &&
+	   curl -fsSL -o "$h/$HDR_PKG.sha256" "$HDR_URL/$HDR_PKG.sha256" &&
+	   (cd "$h" && sha256sum -c --quiet "$HDR_PKG.sha256"); then
+		rm -rf "/usr/src/linux-headers-$KVER"
+		zstd -dc "$h/$HDR_PKG" | tar -xf - -C /
+		ln -sfn "/usr/src/linux-headers-$KVER" "/usr/lib/modules/$KVER/build"
+		echo "Kernel headers installed (/usr/lib/modules/$KVER/build): DKMS drivers can be built for this kernel."
+		if command -v dkms >/dev/null; then
+			echo "Building DKMS drivers for $KVER..."
+			dkms autoinstall -k "$KVER" || echo "Note: a DKMS driver didn't build for $KVER (see above); the kernel works anyway."
+		fi
+	else
+		echo "Note: couldn't download the kernel headers for $KVER; run this again later with --headers."
+	fi
+	rm -rf "$h"
+}
+
+FORCE=0; case " $* " in *" --force "*) FORCE=1 ;; esac
 if [ "$(uname -r)" = "$KVER" ] && [ $FORCE = 0 ]; then
-	echo "You're already on the newest kernel ($KVER). Nothing to do."
+	echo "You're already on the newest kernel ($KVER)."
+	if [ $WANT_HDR = 1 ] && { case " $* " in *" --headers "*) true ;; *) [ ! -e "/usr/lib/modules/$KVER/build" ] ;; esac; }; then
+		install_headers
+	else
+		echo "Nothing to do."
+	fi
 	exit 0
 fi
 
@@ -118,6 +155,7 @@ done
 rm -rf "/usr/lib/modules/$KVER"
 mv "/usr/lib/modules/$KVER.new" "/usr/lib/modules/$KVER"
 depmod -a "$KVER"
+[ $WANT_HDR = 1 ] && install_headers
 
 echo "Building initrd (takes a minute)..."
 mkinitcpio -k "$KVER" -g "$T/initrd.img" >"$T/mkinitcpio.log" 2>&1 || {

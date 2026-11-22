@@ -14,7 +14,7 @@
 ![KDE Plasma 6.8](https://img.shields.io/badge/KDE_Plasma-6.8-1d99f3)
 ![Wayland](https://img.shields.io/badge/Wayland-yes-2ea44f)
 
-![KDE "About this System" on the PS5: kernel 7.3.4-p1472, KDE Plasma 6.8.2 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 13.7 GiB RAM](images/about-this-system-p1472.png)
+![KDE "About this System" on the PS5: kernel 7.3.5-pc8fe, KDE Plasma 6.8.3 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 13.7 GiB RAM](images/about-this-system-pc8fe.png)
 
 **This fork is tested on** a PS5 Pro, firmware 11.60, with the loader from this repo's release ([below](#the-loader)). **Upstream's image is tested on** a PS5 launch model Digital Edition (CFI-1016B), firmware 13.60, [soniciso1's ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases), a 1 TB USB-C SSD, a 1440p 144 Hz monitor and a 4K 60 Hz TV. The image is built on the official [ps5-linux CachyOS image](https://github.com/ps5-linux/ps5-linux-image), see [Credits](#credits).
 
@@ -178,7 +178,7 @@ On an older install without that icon, run this once on the desktop as your norm
 curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update.sh | sh
 ```
 
-![The updater on the desktop: the "Update PS5 CachyOS" icon among the desktop icons](images/updater-p1472.jpg)
+![The PS5 CachyOS Updater: console info at the top, one line per step, all done in 1 min 21 s](images/updater-pc8fe.png)
 
 It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam extras**, **FreeSync and 1080p 144 Hz** (asks), the **fan curve** (asks, default no), the **update icon** with a daily check for new kernels, and finally **all system packages and Flatpak apps** (asks). Restart afterwards if the kernel changed.
 
@@ -189,6 +189,7 @@ It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam
 
 - **Kernel only:** `curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh`. Replaces `/boot/efi/bzImage` + `initrd.img` (old ones kept as `.bak`) and the modules, incl. the Wi-Fi driver. FreeSync and 1080p 144 Hz also need `hdmi.vrr=1 hdmi.extended_tmds=1` in `cmdline.txt`. Booting from USB with root on an M.2 drive works too.
 - **Gaming Mode and Steam extras only:** `curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-extras.sh | sudo sh`. Stops Steam from "updating" on every switch between Gaming Mode and the desktop, adds the performance overlay, makes shader pre-caching use all 16 threads, lets you pick the refresh rate in Steam's own display settings, turns on HDR in Gaming Mode (PS5 Fat), and adds the **12-bit Colour** icon. Changed files are kept as `.bak-extras`; a launcher you edited yourself is left alone (`--force` replaces it).
+- **Kernel headers** (to build extra drivers with DKMS, e.g. `xone` for the Xbox Wireless Adapter): `curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/update-kernel.sh | sudo sh -s -- --headers`. Puts the build files at `/usr/lib/modules/<kernel>/build` and builds your DKMS drivers. Later kernel updates install new headers by themselves.
 - **Undo** each one: the same line with `| sudo sh -s -- --rollback` at the end.
 </details>
 
@@ -207,6 +208,7 @@ The image is on btrfs with **snapper**: every `pacman` run (also the updater's p
 | 1080p @ 60 / 120 / 144 Hz | ✅ (144 Hz needs a monitor that offers it) |
 | 1440p @ 60 / 120 / 144 Hz | ✅ |
 | 2160p @ 60 Hz | ✅ |
+| 75 Hz and other monitor modes (e.g. 1080p @ 75 Hz) | ✅ with kernel 7.3.5-pc8fe or newer |
 | 2160p @ 120 Hz | Needs an HDMI 2.1 TV (untested) |
 
 **FreeSync / VRR** works at **60 and 120 Hz**, not at 144 Hz (the PS5's HDMI chip doesn't do variable refresh there). First turn on **Adaptive-Sync / FreeSync** in the monitor's own menu. For fast games that already run above 144 fps (CS2, for example), fixed 144 Hz usually feels better.
@@ -388,3 +390,11 @@ Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 sec
 - **[soniciso1/ps5-linux-loader](https://github.com/soniciso1/ps5-linux-loader/releases)**: Linux loader with 13.60 support
 - **[ps5-linux](https://github.com/ps5-linux)**: [image](https://github.com/ps5-linux/ps5-linux-image) upstream's image is built on, [kernel patches](https://github.com/ps5-linux/ps5-linux-patches), [Wi-Fi driver](https://github.com/ps5-linux/ps5-linux-mwifiex), [tools](https://github.com/ps5-linux/ps5-linux-tools)
 - **linux-cachyos-bc250** and **[bc250-emulators](https://github.com/MastaG/bc250-emulators)**: the GFX1013 kernel patches, Mesa and emulator packages of this fork
+- **[QuartConz/ps5-pro-viola-bluetooth](https://github.com/QuartConz/ps5-pro-viola-bluetooth)** and **[WizGery/ps5-mediatek-fixes](https://github.com/WizGery/ps5-mediatek-fixes)**: PS5 Pro Bluetooth driver work
+- **[MastaG](https://github.com/MastaG)**: PS5 Pro Bluetooth port and testing ([#7](https://github.com/abrocoma/PS5-CachyOS/pull/7)), faster DualSense reconnects, the loader merge with pairing export ([soniciso1 #31](https://github.com/soniciso1/ps5-linux-loader/pull/31))
+- **Slip-Up**: pairing export in the loader ([ps5-linux-loader #97](https://github.com/ps5-linux/ps5-linux-loader/pull/97))
+- **kadhtobi** and everyone who tested and reported issues, especially on the PS5 Pro and Slim
+
+## License
+
+The scripts, files and docs in this repo are under the [GNU GPL-3.0](LICENSE): you may use, change and share them, and changed versions must stay under the GPL-3.0 with the source available. The kernel patches in `patches/` keep the license of the code they change (the Linux kernel's GPL-2.0), and the software in the image keeps its own licenses.
