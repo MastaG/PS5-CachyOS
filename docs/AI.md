@@ -3,12 +3,13 @@
 > [!NOTE]
 > Copied from the linux-cachyos-bc250 repository (`bfb1d54b`), where the kernel patches, Mesa and PyTorch
 > packages for the BC-250 board's GPU are made. The PS5 has the same GPU family (GFX1013), and this
-> image ships those patches and that Mesa. **Its numbers are measured on a BC-250, not on a PS5: the PS5's clocks, CU count and memory differ, so take them as a starting point. Where the BC-250 needs something different from the PS5, this copy says what to do on the PS5.**
+> image ships those patches and that Mesa. **Its numbers are measured on a BC-250, not on a PS5 (except [Inkling-2-Mini](#faster-chat-inkling-2-mini), measured on a PS5 Pro): the PS5's clocks, CU count and memory differ, so take them as a starting point. Where the BC-250 needs something different from the PS5, this copy says what to do on the PS5.**
 
 Two setups, both the fastest we measured on the board
 ([numbers and what else we tried](AI-BENCHMARKS.md)):
 
 - **Chat (LLM):** Qwen3.8-27B with llama.cpp: about 27 tokens/s (31 on code), 32k context.
+- **Faster chat (LLM):** Inkling-2-Mini with a llama.cpp fork: about 47 tokens/s, 32k context (59 tokens/s on a PS5 Pro).
 - **Images:** ComfyUI with SDXL-Lightning: a 1024×1024 image in about 20 s.
 
 Each needs most of the board's memory, so run one at a time.
@@ -151,6 +152,68 @@ enough, and the VRMs cool down within seconds between replies.
 
 Check with `sensors` (`GPU VRM Temp`). If it goes above about 110 °C, add
 airflow over the VRM heatsinks, or don't feed it very long prompts.
+
+## Faster chat: Inkling-2-Mini
+
+[Inkling-2-Mini](https://huggingface.co/unsloth/Inkling-2-Mini-GGUF) (Thinking Machines) is a
+26B mixture-of-experts model: only about 3.4B of its parameters work on each token, so it runs about
+twice as fast as Qwen3.8-27B at a similar file size. On a PS5 Pro: **686 tokens/s reading a prompt and
+59 tokens/s writing**.
+
+The packaged llama.cpp can't run it yet (the `inkling2` architecture is not in it). Trecto34's
+[llama-inkling2-vulkan](https://github.com/Trecto34/llama-inkling2-vulkan) is llama.cpp with that
+support and Vulkan shaders written for this model. Build it yourself:
+
+```bash
+sudo pacman -S --needed cmake ninja git vulkan-headers spirv-headers shaderc glslang
+git clone https://github.com/Trecto34/llama-inkling2-vulkan.git ~/llama-inkling2-vulkan
+cd ~/llama-inkling2-vulkan
+git checkout e734ca0          # v0.2-vulkan, the version measured here
+cmake -B build -G Ninja -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target llama-server llama-cli llama-bench
+
+mkdir -p ~/models && cd ~/models
+curl -LO https://huggingface.co/unsloth/Inkling-2-Mini-GGUF/resolve/main/Inkling-2-Mini-UD-IQ3_XXS.gguf   # 11.7 GB
+```
+
+Stop Gaming Mode first ([server mode](#before-you-start-server-mode)): the model needs about 12 GB.
+Run it with the same kind of service file as above, for example
+`~/.config/systemd/user/llama-inkling.service`. Stop the Qwen3.8 service first: only one model fits at a time.
+
+```ini
+[Unit]
+Description=llama.cpp server (Inkling-2-Mini)
+
+[Service]
+ExecStart=%h/llama-inkling2-vulkan/build/bin/llama-server \
+    --model %h/models/Inkling-2-Mini-UD-IQ3_XXS.gguf \
+    --n-gpu-layers 99 --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 \
+    --ctx-size 32768 --ubatch-size 128 --parallel 1 --ctx-checkpoints 1 --cache-ram 0 \
+    --host 0.0.0.0 --port 8080
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+**Set `--ubatch-size` with the context size.** In this build the GPU's work buffer grows with the
+context *times* the micro-batch, not the KV cache (that is small: 136 MB at 8k). Pick a row:
+
+| `--ctx-size` | `--ubatch-size` | Prompt speed | Memory left |
+|---:|---:|---:|---:|
+| `8192` | `512` (default) | 676 t/s | 1.5 GB |
+| `16384` | `256` | 514 t/s | 1.6 GB |
+| **`32768`** | **`128`** | **374 t/s** | **1.5 GB** |
+| `65536` | `64` | 242 t/s | 1.4 GB |
+
+Each row starts and answers a short request; the context was not filled with text. The micro-batch
+only changes how fast prompts are read: writing stays at about 59 tokens/s.
+
+- With the default micro-batch, 16k did not fit: the kernel killed another program
+  (`plasma-welcome`) for memory before llama-server gave up.
+
+- It thinks before it answers by default, so give API requests room (`max_tokens` 1000+).
+- Like any local model it can state wrong facts with confidence. Check what matters.
 
 ## Images: ComfyUI with SDXL-Lightning
 

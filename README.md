@@ -308,12 +308,13 @@ The kernel carries the GFX1013 compute (KFD) fixes made for the BC-250 board (sa
 - **[Local AI](docs/AI.md)**: chat with llama.cpp (Vulkan) and images with ComfyUI.
 - **[ROCm / KFD support](docs/ROCM.md)**: why the patches are needed, ROCm and the `bc250-pytorch` package (from the `[bc250-cachyos]` repo the image already has).
 - **[AI benchmarks](docs/AI-BENCHMARKS.md)**: what was measured on the BC-250, and what else was tried.
+- **Measured on the PS5 Pro:** [Inkling-2-Mini](docs/AI.md#faster-chat-inkling-2-mini), a 26B mixture-of-experts model, reads prompts at 686 tokens/s and writes 59 tokens/s with a llama.cpp fork (Vulkan).
 
 What's different on the PS5:
 
 - **Kernel parameters:** `ttm.pages_limit=3670016` and `amdgpu.sched_policy=2` are already in this image's `cmdline.txt`. The `steam` user is in the `render` group (`/dev/kfd`).
 - **No CU unlock:** `amdgpu.bc250_cc_write_mode` / `bc250_cc_wgp_mask` are BC-250 only and not in this kernel.
-- **Numbers:** the guide's benchmarks are BC-250 measurements; the PS5's clocks, CU count and memory differ ([boost](#7-extras-boost-fan-and-video) helps). The PS5 Pro gives Linux about 15 GiB of memory, shared by the CPU and GPU, so the guide's "one at a time" applies here too: stop Gaming Mode before loading a big model ([how](docs/AI.md#before-you-start-server-mode)).
+- **Numbers:** the guide's benchmarks are BC-250 measurements (Inkling-2-Mini was measured on the PS5 Pro too); the PS5's clocks, CU count and memory differ ([boost](#7-extras-boost-fan-and-video) helps). The PS5 Pro gives Linux about 15 GiB of memory, shared by the CPU and GPU, so the guide's "one at a time" applies here too: stop Gaming Mode before loading a big model ([how](docs/AI.md#before-you-start-server-mode)).
 
 ## 10. Installing to the internal M.2
 
