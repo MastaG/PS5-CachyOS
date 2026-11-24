@@ -164,13 +164,9 @@ The same menu has the **Performance Overlay Level** (fps, CPU/GPU load, temperat
 
 ## 7. Extras: boost, fan and video
 
-**`install.sh`** checks the core fixes (all in the image) and offers extras: CPU **boost**, **Wi-Fi driver** reinstall, **Cloudflare DNS** and **boot to desktop**.
+**Update PS5 CachyOS** (the desktop icon, [section 5](#5-updating)) offers the extras at the end that aren't installed yet, one key each: CPU **boost**, **Cloudflare DNS** and the **Xbox Wireless Adapter** driver.
 
-```sh
-git clone https://github.com/abrocoma/PS5-CachyOS
-cd PS5-CachyOS
-sudo ./install.sh        # -y installs every extra
-```
+On the official ps5-linux image, use `install.sh` instead ([docs/advanced.md](docs/advanced.md#using-the-official-image-instead)).
 
 **Fan:** the image runs a quieter fan curve and shows "SoC Temp" in the panel. Back to the kernel's default curve: `curl -fsSL https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/scripts/quiet-fan.sh | sh -s -- --remove`. Don't run ps5-linux-tools' `ps5fan` service with it: it pins the fan loud.
 
@@ -233,7 +229,7 @@ A few `CR` errors in dmesg at boot are normal.
 
 ### Websites slow to start loading
 
-Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 seconds to start. Fix: `install.sh` → **Cloudflare DNS**, or in **System Settings → Wi-Fi & Internet** set IPv4 and IPv6 to **Automatic (Only addresses)** with DNS `1.1.1.1, 1.0.0.1`.
+Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 seconds to start. Fix: **Update PS5 CachyOS** → **d** (Cloudflare DNS) at the end, or in **System Settings → Wi-Fi & Internet** set IPv4 and IPv6 to **Automatic (Only addresses)** with DNS `1.1.1.1, 1.0.0.1`.
 
 ---
 
