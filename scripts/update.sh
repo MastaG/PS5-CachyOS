@@ -434,13 +434,16 @@ hwcon_step() {
 }
 while :; do
 	menu=
-	has_boost || menu="$menu\n    b   CPU boost (ps5boost)"
-	has_dns   || menu="$menu\n    d   Faster website loading (Cloudflare DNS 1.1.1.1)"
-	has_xbox  || menu="$menu\n    x   Xbox Wireless Adapter driver (USB dongle for Xbox controllers)"
-	has_hwcon || menu="$menu\n    h   PS5 Hardware Control app by NotHavocc (fan, temps, GPU, LED)"
+	keys=
+	has_boost || { menu="$menu\n    [b]  CPU boost (ps5boost)"; keys="$keys b"; }
+	has_dns   || { menu="$menu\n    [d]  Faster website loading (Cloudflare DNS 1.1.1.1)"; keys="$keys d"; }
+	has_xbox  || { menu="$menu\n    [x]  Xbox Wireless Adapter driver (USB dongle for Xbox controllers)"; keys="$keys x"; }
+	has_hwcon || { menu="$menu\n    [h]  PS5 Hardware Control app by NotHavocc (fan, temps, GPU, LED)"; keys="$keys h"; }
+	# "b, d or x" from the keys still on offer
+	keylist=$(echo $keys | sed 's/ /, /g; s/\(.*\), /\1 or /')
 	[ -n "$menu" ] || break
 	n=$(printf "$menu" | grep -c .)
-	printf "%s\n  %sOptional extras%s$menu\n\n    %sPress a letter to install    Enter = done%s" "$CL" "$YEL" "$OFF" "$DIM" "$OFF"
+	printf "%s\n  %sOptional extras (not installed yet)%s$menu\n\n    %sPress %s to install that one, or Enter to finish.%s" "$CL" "$YEL" "$OFF" "$DIM" "$keylist" "$OFF"
 	k=$(key)
 	# remove the menu again
 	if [ -n "$CL" ]; then i=0; while [ $i -lt $((n + 3)) ]; do printf '\r\033[K\033[1A'; i=$((i + 1)); done; printf '\r\033[K'; else echo; fi
