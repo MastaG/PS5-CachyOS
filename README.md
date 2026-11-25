@@ -164,7 +164,7 @@ The same menu has the **Performance Overlay Level** (fps, CPU/GPU load, temperat
 
 ## 7. Extras: boost, fan and video
 
-**Update PS5 CachyOS** (the desktop icon, [section 5](#5-updating)) offers the extras at the end that aren't installed yet, one key each: CPU **boost**, **Cloudflare DNS** and the **Xbox Wireless Adapter** driver.
+**Update PS5 CachyOS** (the desktop icon, [section 5](#5-updating)) offers the extras at the end that aren't installed yet, one key each: CPU **boost**, **Cloudflare DNS**, the **Xbox Wireless Adapter** driver and the **PS5 Hardware Control** app.
 
 On the official ps5-linux image, use `install.sh` instead ([docs/advanced.md](docs/advanced.md#using-the-official-image-instead)).
 
@@ -181,6 +181,8 @@ On the official ps5-linux image, use `install.sh` instead ([docs/advanced.md](do
 
 Values reset at every boot. Only lower the curve if your console's cooling is in good shape.
 </details>
+
+**PS5 Hardware Control:** [NotHavocc](https://github.com/NotHavocc)'s app ([ps5-hwcon-gui](https://github.com/NotHavocc/ps5-hwcon-gui)) shows temperatures, clocks and fan with history charts, and sets the fan, GPU clock, LED colour and more. Open it from the app menu; it asks for your password. Changing the fan curve in it replaces the image's quiet curve until the next restart. Its CPU page needs a kernel with a CPU frequency driver; on other kernels that page stays empty. For Gaming Mode there's the Decky version, [ps5-hwcon-plugin](https://github.com/NotHavocc/ps5-hwcon-plugin).
 
 **Video:** Firefox and Chrome use hardware video decode. The APU has **no AV1 decode**, so use the enhanced-h264ify extension for YouTube. KDE can't show GPU load; use `nvtop`.
 
@@ -239,6 +241,7 @@ Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 sec
 - **[ps5-linux](https://github.com/ps5-linux)**: [image](https://github.com/ps5-linux/ps5-linux-image) this guide's image is built on, [kernel patches](https://github.com/ps5-linux/ps5-linux-patches), [Wi-Fi driver](https://github.com/ps5-linux/ps5-linux-mwifiex), [tools](https://github.com/ps5-linux/ps5-linux-tools)
 - **[QuartConz/ps5-pro-viola-bluetooth](https://github.com/QuartConz/ps5-pro-viola-bluetooth)** and **[WizGery/ps5-mediatek-fixes](https://github.com/WizGery/ps5-mediatek-fixes)**: PS5 Pro Bluetooth driver work
 - **[MastaG](https://github.com/MastaG)**: PS5 Pro Bluetooth port and testing ([#7](https://github.com/abrocoma/PS5-CachyOS/pull/7)), faster DualSense reconnects
+- **[NotHavocc](https://github.com/NotHavocc)**: [PS5 Hardware Control](https://github.com/NotHavocc/ps5-hwcon-gui) app and [Decky plugin](https://github.com/NotHavocc/ps5-hwcon-plugin)
 - **Slip-Up**: pairing export in the loader ([ps5-linux-loader #97](https://github.com/ps5-linux/ps5-linux-loader/pull/97))
 - **kadhtobi** and everyone who tested and reported issues, especially on the PS5 Pro and Slim
 

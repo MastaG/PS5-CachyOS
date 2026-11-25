@@ -17,7 +17,7 @@
 #                         shows a notification when a newer kernel is out
 #   7. System packages:   pacman -Syu + flatpak update + lists new .pacnew files (asks first)
 #   Then optional extras not yet installed (one key each): CPU boost (ps5-linux-tools),
-#   Cloudflare DNS, Xbox Wireless Adapter driver.
+#   Cloudflare DNS, Xbox Wireless Adapter driver, PS5 Hardware Control app (NotHavocc).
 # Steps 1-6 keep backups, so --rollback undoes them (package updates in step 7 can't be undone).
 set -u
 
@@ -382,6 +382,7 @@ has_dns() {
 	[ $n = 1 ]
 }
 has_xbox() { pacman -Q xone-dkms >/dev/null 2>&1; }
+has_hwcon() { [ -x /usr/local/bin/ps5-hwcon-gui ]; }
 # ps5-linux-tools builds ps5_control with make + a C compiler; the image has neither
 boost_step() {
 	{ command -v make >/dev/null && command -v cc >/dev/null; } ||
@@ -411,11 +412,19 @@ xbox_step() {
 	fetch update-kernel.sh | kernel_sh -s -- --headers &&
 		sudo pacman -S --needed --noconfirm gcc make dkms xone-dkms xone-dongle-firmware
 }
+# NotHavocc's PS5 Hardware Control (github.com/NotHavocc/ps5-hwcon-gui). --force: its CPU page
+# needs a kernel with a cpufreq driver; without one the rest of the app still works.
+hwcon_step() {
+	d=$(mktemp -d) && git clone -q --depth 1 https://github.com/NotHavocc/ps5-hwcon-gui "$d/src" &&
+		(cd "$d/src" && bash ./install.sh --force) || { rm -rf "$d"; return 1; }
+	rm -rf "$d"
+}
 while :; do
 	menu=
 	has_boost || menu="$menu\n    b   CPU boost (ps5boost)"
 	has_dns   || menu="$menu\n    d   Faster website loading (Cloudflare DNS 1.1.1.1)"
 	has_xbox  || menu="$menu\n    x   Xbox Wireless Adapter driver (USB dongle for Xbox controllers)"
+	has_hwcon || menu="$menu\n    h   PS5 Hardware Control app by NotHavocc (fan, temps, GPU, LED)"
 	[ -n "$menu" ] || break
 	n=$(printf "$menu" | grep -c .)
 	printf "%s\n  %sOptional extras%s$menu\n\n    %sPress a letter to install    Enter = done%s" "$CL" "$YEL" "$OFF" "$DIM" "$OFF"
@@ -436,6 +445,9 @@ while :; do
 		else
 			bad "Xbox adapter" "failed"; why Xbox; break
 		fi ;;
+	h|H)
+		busy "PS5 Hardware Control" "downloading and installing (1-3 min)"
+		if run Hwcon hwcon_step; then ok "PS5 Hardware Control" "installed: app menu, PS5 Hardware Control"; else bad "PS5 Hardware Control" "failed"; why Hwcon; break; fi ;;
 	*) break ;;
 	esac
 done
