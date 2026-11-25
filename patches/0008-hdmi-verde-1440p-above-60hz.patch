@@ -1,0 +1,45 @@
+From: abrocoma
+Subject: [PATCH] hdmi: VERDE 1440p above 60 Hz (verde_1440p_high, default on)
+
+On VERDE (PS5 Slim) only the stock modes were offered (1080p60/120, 1440p60,
+2160p60), so 1440p120/144 never showed up. With verde_1440p_high (default on)
+the sink's own 1440p timings are offered up to its TMDS limit; above 340 MHz
+only when the sink does scrambling. FLAVA3 is unchanged.
+Off: hdmi.verde_1440p_high=0. Tested on a Slim (issue #11): 1440p120/144.
+
+---
+diff --git a/drivers/ps5/hdmi.c b/drivers/ps5/hdmi.c
+index 95220796e..d221b1c9c 100755
+--- a/drivers/ps5/hdmi.c
++++ b/drivers/ps5/hdmi.c
+@@ -92,6 +92,9 @@ MODULE_PARM_DESC(verde_frl, "VERDE: FRL for 4K100/120 and 4K60 deep colour, and
+ static bool verde_vrr;
+ module_param(verde_vrr, bool, 0444);
+ MODULE_PARM_DESC(verde_vrr, "VERDE: HDMI VRR for sinks with HDMI VRR and a FreeSync range (default off)");
++static bool verde_1440p_high = true;
++module_param(verde_1440p_high, bool, 0444);
++MODULE_PARM_DESC(verde_1440p_high, "VERDE: offer the sink's own 1440p timings above 60 Hz, e.g. 1440p120/144, up to its TMDS limit (default on)");
+ static bool verde_allm;
+ module_param(verde_allm, bool, 0444);
+ MODULE_PARM_DESC(verde_allm, "VERDE: ALLM, following the allm parameter (default off)");
+@@ -2822,6 +2825,20 @@ bool isHdmiModeValid(const struct drm_display_mode *mode,
+ 	if (isHdmiModeStock(mode))
+ 		return true;
+ 
++	/*
++	 * VERDE, opt-in: the sink's own 1440p timings (no VIC). The bridge
++	 * gets the 1440p setup from linkConfigVerde() and takes the timing
++	 * from the DP stream. Above 340 MHz the sink must do scrambling.
++	 */
++	if (hdmi_ic_type == HDMI_IC_TYPE_VERDE && READ_ONCE(verde_1440p_high) &&
++	    mode->hdisplay == 2560 && mode->vdisplay == 1440) {
++		if (!hasPlainSyncFlags(mode) || !isTimingValid(mode) ||
++		    mode->clock > hdmi_tmds_limit_khz(info))
++			return false;
++		return mode->clock <= 340000 ||
++		       (info->hdmi.scdc.supported && info->hdmi.scdc.scrambling.supported);
++	}
++
+ 	/* The plan supplies the required FRL rate for this converter timing. */
+ 	if (getHdmiFrlConfig(mode, 10, &config))
+ 		return (READ_ONCE(frl_yuv420) || frl_config_allowed(&config, info)) &&

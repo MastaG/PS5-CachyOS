@@ -13,8 +13,8 @@
 # and cmdline.txt are not touched.
 set -eu
 
-KVER=7.3.5-pc8fe
-KDATE="20 Nov 2026"   # release date, shown by the updater
+KVER=7.3.5-pc8fe2
+KDATE="25 Nov 2026"   # release date, shown by the updater
 PKG=ps5-kernel-$KVER.tar.zst
 URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/kernel}
 BOOT=${PS5_BOOT:-/boot/efi}

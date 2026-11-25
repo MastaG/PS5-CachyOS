@@ -129,7 +129,7 @@ It updates, in order: the **PS5 kernel**, **fixes**, the **Gaming Mode and Steam
 | Mode | Status |
 |---|---|
 | 1080p @ 60 / 120 / 144 Hz | ✅ (144 Hz needs a monitor that offers it) |
-| 1440p @ 60 / 120 / 144 Hz | ✅ |
+| 1440p @ 60 / 120 / 144 Hz | ✅ (PS5 Slim: 120 / 144 Hz with kernel 7.3.5-pc8fe2 or newer) |
 | 2160p @ 60 Hz | ✅ |
 | 75 Hz and other monitor modes (e.g. 1080p @ 75 Hz) | ✅ with kernel 7.3.5-pc8fe or newer |
 | 2160p @ 120 Hz | Needs an HDMI 2.1 TV (untested) |
