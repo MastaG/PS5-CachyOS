@@ -7,7 +7,7 @@
 ![KDE Plasma 6.8](https://img.shields.io/badge/KDE_Plasma-6.8-1d99f3)
 ![Wayland](https://img.shields.io/badge/Wayland-yes-2ea44f)
 
-![KDE "About this System" on the PS5: kernel 7.3.5-pc8fe, KDE Plasma 6.8.3 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 13.7 GiB RAM](images/about-this-system-pc8fe.png)
+![KDE "About this System" on the PS5: kernel 7.3.5-pc8fe3, KDE Plasma 6.8.3, Qt 6.12.1 on Wayland, 16 × AMD Custom Zen 2 (Oberon), 14.1 GiB RAM](images/about-this-system-pc8fe3.png)
 
 **Tested on** a PS5 launch model Digital Edition (CFI-1016B), firmware 13.60, [ps5-linux-loader](https://github.com/ps5-linux/ps5-linux-loader) (build `badfe48`, attached to the [latest release](https://github.com/abrocoma/PS5-CachyOS/releases/latest)), a 1 TB USB-C SSD, a 1440p 144 Hz monitor and a 4K 60 Hz TV. The image is built on the official [ps5-linux CachyOS image](https://github.com/ps5-linux/ps5-linux-image), see [Credits](#credits).
 
