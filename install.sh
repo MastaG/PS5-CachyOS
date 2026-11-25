@@ -42,7 +42,7 @@ label() { case $1 in
     fan) if kfan; then echo "Boost control"; else echo "Fan + boost control"; fi ;; wifi) echo "Wi-Fi driver" ;;
     dns) echo "Faster internet loading (Cloudflare DNS)" ;; desktop) echo "Skip Gamescope, boot to desktop" ;; esac; }
 note() { case $1 in
-    fan) echo "needs internet" ;; wifi) echo "needs internet, a few minutes" ;;
+    fan) echo "downloads + builds it" ;; wifi) echo "needs internet, a few minutes" ;;
     dns) echo "sets 1.1.1.1 on wired + Wi-Fi" ;; desktop) echo "instead of Gaming Mode" ;; esac; }
 status() { if "has_$1"; then echo "installed"; else note "$1"; fi; }
 
@@ -213,7 +213,8 @@ fi
 [ -n "$(echo $PICK)" ] && echo "== Extras"
 
 if picked fan; then
-    if online; then
+    if online && { command -v make >/dev/null && command -v cc >/dev/null ||
+                   pacman -S --needed --noconfirm make gcc >/dev/null; }; then
         d=$(clone https://github.com/ps5-linux/ps5-linux-tools)
         (cd "$d" && ./install.sh)
         if kfan; then
@@ -225,7 +226,7 @@ if picked fan; then
             echo "  fan + boost: installed"
         fi
     else
-        echo "  fan + boost: no internet, skipped. See README section 7."
+        echo "  fan + boost: no internet (or make/gcc could not be installed), skipped. See README section 7."
     fi
 fi
 

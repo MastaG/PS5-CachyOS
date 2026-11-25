@@ -3,7 +3,7 @@
 > [!NOTE]
 > **This is MastaG's fork of [abrocoma/PS5-CachyOS](https://github.com/abrocoma/PS5-CachyOS).** Its image is
 > upstream's image on **btrfs** (CachyOS subvolume layout, snapper), with the GFX1013 compute kernel
-> `7.3.5-pc8fe-bc1`, the BC-250 Mesa, swap file + zswap, a smoother fan curve, boost as an opt-in, the
+> `7.3.5-pc8fe-bc2`, the BC-250 Mesa, swap file + zswap, a smoother fan curve, boost as an opt-in, the
 > emulator repo (nothing installed), Gaming Mode on every boot and an installer for the internal M.2.
 > What exactly differs: [image/README.md](image/README.md). Tested on a **PS5 Pro** (firmware 11.60).
 
@@ -47,7 +47,7 @@ Everything upstream's image has is still in this one (Gaming Mode, HDR, FreeSync
 | | Upstream ([abrocoma/PS5-CachyOS](https://github.com/abrocoma/PS5-CachyOS)) | This fork |
 |---|---|---|
 | **File system** | ext4 | **btrfs** with CachyOS's subvolumes (`@`, `@home`, `@root`, `@srv`, `@cache`, `@log`, `@tmp`), zstd compression, **snapper** snapshots before and after every pacman run, btrfs Assistant |
-| **Kernel** | 7.3.5-pc8fe | **7.3.5-pc8fe-bc1**: the same kernel plus the GFX1013 **amdgpu/KFD fixes** of linux-cachyos-bc250 (`patches/0008`-`0016`), which make GPU compute reliable: [KytyPS5-Native](#8-emulators) and [AI/LLM work](#9-ai-and-gpu-compute) (llama.cpp, ComfyUI, ROCm). |
+| **Kernel** | 7.3.5-pc8fe3 | **7.3.5-pc8fe-bc2**: upstream's kernel (1440p above 60 Hz on the Slim, CPU frequency driver: `patches/0017`, `0018`) plus the GFX1013 **amdgpu/KFD fixes** of linux-cachyos-bc250 (`patches/0008`-`0016`), which make GPU compute reliable: [KytyPS5-Native](#8-emulators) and [AI/LLM work](#9-ai-and-gpu-compute) (llama.cpp, ComfyUI, ROCm). The image still has `7.3.5-pc8fe-bc1`; **Update PS5 CachyOS** installs bc2. |
 | **Kernel command line** | | the BC-250's compute settings (`ttm.pages_limit`, `amdgpu.sched_policy=2`, `cwsr_enable=0`, `vm_update_mode=0`, `bc250_gfx_eop_events=2`) and zswap |
 | **Mesa** | Arch's | the BC-250 Mesa from `[bc250-cachyos]`: built for Zen 2, GFX1013 compute queue fix, FSR 4 support. Mesh shaders (DirectMesh) stay off on the PS5: they hang the PS5 Pro's GPU in Vulkan CTS |
 | **Swap** | zram | a swap file in its own subvolume (32 GB on a 128 GB+ drive) with zswap in front |
@@ -206,7 +206,7 @@ The image is on btrfs with **snapper**: every `pacman` run (also the updater's p
 | Mode | Status |
 |---|---|
 | 1080p @ 60 / 120 / 144 Hz | ✅ (144 Hz needs a monitor that offers it) |
-| 1440p @ 60 / 120 / 144 Hz | ✅ |
+| 1440p @ 60 / 120 / 144 Hz | ✅ (PS5 Slim: 120 / 144 Hz with kernel 7.3.5-pc8fe2 or newer) |
 | 2160p @ 60 Hz | ✅ |
 | 75 Hz and other monitor modes (e.g. 1080p @ 75 Hz) | ✅ with kernel 7.3.5-pc8fe or newer |
 | 2160p @ 120 Hz | Needs an HDMI 2.1 TV (untested) |
@@ -259,6 +259,8 @@ cd PS5-CachyOS
 sudo ./install.sh        # -y installs every extra
 ```
 
+**Update PS5 CachyOS** (the desktop icon, [section 5](#5-updating)) also offers, at the end, the extras that aren't installed yet, one key each: CPU **boost** (the same as `sudo ps5-boost on`), **Cloudflare DNS**, the **Xbox Wireless Adapter** driver and the **PS5 Hardware Control** app.
+
 **Fan:** the image runs a smooth fan curve (it rises gradually, no jumps from silent to loud) and shows "SoC Temp" in the panel. Back to the kernel's default curve: `curl -fsSL https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/scripts/quiet-fan.sh | sh -s -- --remove`. Don't run ps5-linux-tools' `ps5fan` service with it: it pins the fan loud.
 
 <details>
@@ -272,6 +274,10 @@ sudo ./install.sh        # -y installs every extra
 
 Values reset at every boot. Only lower the curve if your console's cooling is in good shape.
 </details>
+
+**PS5 Hardware Control:** [NotHavocc](https://github.com/NotHavocc)'s app ([ps5-hwcon-gui](https://github.com/NotHavocc/ps5-hwcon-gui)) shows temperatures, clocks and fan with history charts, and sets the fan, GPU clock, LED colour and more. Open it from the app menu; it asks for your password. Changing the fan curve in it replaces the image's quiet curve until the next restart. Its CPU page works with the CPU frequency driver in kernel 7.3.5-pc8fe-bc2 or newer (see below). For Gaming Mode there's the Decky version, [ps5-hwcon-plugin](https://github.com/NotHavocc/ps5-hwcon-plugin).
+
+**CPU frequency:** from kernel 7.3.5-pc8fe-bc2 (Update PS5 CachyOS installs it) the CPU speeds up and slows down with load like on a PC: `/sys/devices/system/cpu/cpufreq` with the usual governors (default `schedutil`) and a `boost` switch. Boost on (the default with CPU boost installed): every core at 3.5 GHz, for gaming. Boost off: 800 MHz-3.2 GHz with the load, cooler and quieter on the desktop: `echo 0 | sudo tee /sys/devices/system/cpu/cpufreq/boost`. Driver: [`patches/0018`](patches/0018-ps5-cpufreq.patch) (from upstream), PS5 and Slim (not the Pro yet).
 
 **Video:** Firefox and Chrome use hardware video decode. The APU has **no AV1 decode**, so use the enhanced-h264ify extension for YouTube. KDE can't show GPU load; use `nvtop`.
 
@@ -381,7 +387,7 @@ A few `CR` errors in dmesg at boot are normal.
 
 ### Websites slow to start loading
 
-Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 seconds to start. Fix: `install.sh` → **Cloudflare DNS**, or in **System Settings → Wi-Fi & Internet** set IPv4 and IPv6 to **Automatic (Only addresses)** with DNS `1.1.1.1, 1.0.0.1`.
+Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 seconds to start. Fix: **Update PS5 CachyOS** → **d** (Cloudflare DNS) at the end, or in **System Settings → Wi-Fi & Internet** set IPv4 and IPv6 to **Automatic (Only addresses)** with DNS `1.1.1.1, 1.0.0.1`.
 
 ---
 
@@ -392,7 +398,9 @@ Some routers' DNS stalls on certain lookups, so websites and Steam take 5-10 sec
 - **[ps5-linux](https://github.com/ps5-linux)**: [image](https://github.com/ps5-linux/ps5-linux-image) upstream's image is built on, [kernel patches](https://github.com/ps5-linux/ps5-linux-patches), [Wi-Fi driver](https://github.com/ps5-linux/ps5-linux-mwifiex), [tools](https://github.com/ps5-linux/ps5-linux-tools)
 - **linux-cachyos-bc250** and **[bc250-emulators](https://github.com/MastaG/bc250-emulators)**: the GFX1013 kernel patches, Mesa and emulator packages of this fork
 - **[QuartConz/ps5-pro-viola-bluetooth](https://github.com/QuartConz/ps5-pro-viola-bluetooth)** and **[WizGery/ps5-mediatek-fixes](https://github.com/WizGery/ps5-mediatek-fixes)**: PS5 Pro Bluetooth driver work
-- **[MastaG](https://github.com/MastaG)**: PS5 Pro Bluetooth port and testing ([#7](https://github.com/abrocoma/PS5-CachyOS/pull/7)), faster DualSense reconnects, the loader merge with pairing export ([soniciso1 #31](https://github.com/soniciso1/ps5-linux-loader/pull/31))
+- **[MastaG](https://github.com/MastaG)**: PS5 Pro Bluetooth port and testing ([#7](https://github.com/abrocoma/PS5-CachyOS/pull/7)), faster DualSense reconnects
+- **[NotHavocc](https://github.com/NotHavocc)**: [PS5 Hardware Control](https://github.com/NotHavocc/ps5-hwcon-gui) app and [Decky plugin](https://github.com/NotHavocc/ps5-hwcon-plugin)
+- **[MassZero0](https://github.com/MassZero0/ps5-linux-cpuclock)**: found the SMU message for CPU P-states that `ps5-cpufreq` uses
 - **Slip-Up**: pairing export in the loader ([ps5-linux-loader #97](https://github.com/ps5-linux/ps5-linux-loader/pull/97))
 - **kadhtobi** and everyone who tested and reported issues, especially on the PS5 Pro and Slim
 

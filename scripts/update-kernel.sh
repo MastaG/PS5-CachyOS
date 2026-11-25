@@ -13,13 +13,13 @@
 # and cmdline.txt are not touched.
 set -eu
 
-KVER=7.3.5-pc8fe-bc1
-KDATE="21 Nov 2026"   # release date, shown by the updater
+KVER=7.3.5-pc8fe-bc2
+KDATE="26 Nov 2026"   # release date, shown by the updater
 PKG=ps5-kernel-$KVER.tar.zst
 URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/MastaG/PS5-CachyOS/main/kernel}
 BOOT=${PS5_BOOT:-/boot/efi}
 HDR_PKG=ps5-kernel-headers-$KVER.tar.zst
-HDR_URL=${PS5_HEADERS_URL:-https://github.com/MastaG/PS5-CachyOS/releases/download/image-2026-11-21}   # release that has the headers for $KVER
+HDR_URL=${PS5_HEADERS_URL:-https://github.com/MastaG/PS5-CachyOS/releases/download/kernel-7.3.5-pc8fe-bc2}   # release that has the headers for $KVER
 # Headers: asked for, or installed before (then every kernel update brings new ones).
 WANT_HDR=0
 case " $* " in *" --headers "*) WANT_HDR=1 ;; esac

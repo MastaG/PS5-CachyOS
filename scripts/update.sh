@@ -18,6 +18,8 @@
 #   6. Updater:           "Update PS5 CachyOS" icon (runs this script) + a daily check that
 #                         shows a notification when a newer kernel is out
 #   7. System packages:   pacman -Syu + flatpak update + lists new .pacnew files (asks first)
+#   Then optional extras not yet installed (one key each): CPU boost (ps5-linux-tools),
+#   Cloudflare DNS, Xbox Wireless Adapter driver, PS5 Hardware Control app (NotHavocc).
 # Steps 1-6 keep backups, so --rollback undoes them (package updates in step 7 can't be undone).
 set -u
 
@@ -366,14 +368,27 @@ if ask "Update system packages and apps now? Takes a few minutes." y; then
 	busy "System packages" "updating (a few minutes)"
 	if run Packages sudo pacman -Syu --noconfirm --needed mangohud lib32-mangohud; then
 		n=$(out Packages | sed -n 's/^Packages (\([0-9]*\)).*/\1/p' | head -1)
-		if [ -n "$n" ]; then ok "System packages" "$n updated"; else ok "System packages" "up to date"; fi
+		tot=$(pacman -Qq 2>/dev/null | grep -c .)
+		if [ -n "$n" ]; then ok "System packages" "$n updated ($tot installed)"; else ok "System packages" "up to date ($tot installed)"; fi
 	else
 		bad "System packages" "failed (run 'sudo pacman -Syu' to see why)"; why Packages
 	fi
 	if command -v flatpak >/dev/null 2>&1; then
 		busy "Flatpak apps" "updating"
+		# what will change, counted before the update; the installed apps by name
+		ua=$(flatpak remote-ls --updates --app --columns=application 2>/dev/null | grep -c .)
+		ur=$(flatpak remote-ls --updates --runtime --columns=application 2>/dev/null | grep -c .)
+		na=$(flatpak list --app --columns=name 2>/dev/null | grep -c .)
+		names=$(flatpak list --app --columns=name 2>/dev/null | head -n 4 | paste -sd, - | sed 's/,/, /g')
+		[ "$na" -gt 4 ] && names="$names, …"
 		if run Flatpak flatpak update -y --noninteractive; then
-			if out Flatpak | grep -qi 'nothing to do'; then ok "Flatpak apps" "up to date"; else ok "Flatpak apps" "updated"; fi
+			if [ "$na" = 0 ]; then
+				ok "Flatpak apps" "none installed"
+			elif [ $((ua + ur)) = 0 ] || out Flatpak | grep -qi 'nothing to'; then
+				ok "Flatpak apps" "up to date: $na apps ($names)"
+			else
+				ok "Flatpak apps" "$ua apps + $ur runtimes updated ($na apps: $names)"
+			fi
 		else
 			bad "Flatpak apps" "failed"; why Flatpak
 		fi
@@ -387,27 +402,93 @@ else
 	skip "System packages" "aborted"
 fi
 
-# Optional extras, only offered while they're not installed
-if ! pacman -Q xone-dkms >/dev/null 2>&1; then
-	printf '%s\n  %sOptional%s   Xbox Wireless Adapter driver (USB dongle for Xbox controllers)\n\n    %sx = install    Enter = done%s' "$CL" "$YEL" "$OFF" "$DIM" "$OFF"
+# Optional extras, only offered while they're not installed. One key each, Enter = done.
+# kernels with ps5-linux-patches 730b80e+ run the fan themselves (hwmon ps5_fan); ps5fan would override that
+kfan()     { grep -qx ps5_fan /sys/class/hwmon/hwmon*/name 2>/dev/null; }
+has_boost() { systemctl is-enabled -q ps5boost 2>/dev/null; }
+has_dns() {
+	n=0
+	for c in $(nmcli -t -f UUID,TYPE con show 2>/dev/null | grep -E ':(802-3-ethernet|802-11-wireless)$' | cut -d: -f1); do
+		nmcli -g ipv4.dns con show "$c" | grep -q '1\.1\.1\.1' || return 1
+		n=1
+	done
+	[ $n = 1 ]
+}
+has_xbox() { pacman -Q xone-dkms >/dev/null 2>&1; }
+has_hwcon() { [ -x /usr/local/bin/ps5-hwcon-gui ]; }
+# ps5-linux-tools builds ps5_control with make + a C compiler; the image has neither.
+# This fork's image has ps5-boost: it builds ps5_control itself and leaves the fan to the image's curve.
+boost_step() {
+	if command -v ps5-boost >/dev/null; then sudo ps5-boost on; return; fi
+	{ command -v make >/dev/null && command -v cc >/dev/null; } ||
+		sudo pacman -S --needed --noconfirm make gcc || return 1
+	d=$(mktemp -d) && git clone -q --depth 1 https://github.com/ps5-linux/ps5-linux-tools "$d/src" &&
+		(cd "$d/src" && sudo ./install.sh) || { rm -rf "$d"; return 1; }
+	rm -rf "$d"
+	if kfan; then
+		sudo systemctl disable --now ps5fan 2>/dev/null || true   # the kernel's fan curve stays in charge
+		sudo systemctl enable --now ps5boost
+	else
+		sudo systemctl enable --now ps5fan ps5boost
+	fi
+}
+dns_step() {
+	nmcli -t -f UUID,TYPE,NAME con show | grep -E '^[^:]+:(802-3-ethernet|802-11-wireless):' |
+	while IFS=: read -r uuid type name; do
+		sudo nmcli con mod "$uuid" ipv4.dns "1.1.1.1 1.0.0.1" ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes &&
+			echo "DNS set on $name" || exit 1
+	done || return 1
+	nmcli -t -f DEVICE,TYPE,STATE device | while IFS=: read -r dev type state; do
+		case "$type:$state" in ethernet:connected|wifi:connected) sudo nmcli device reapply "$dev" >/dev/null ;; esac
+	done
+}
+# headers first, so DKMS builds xone as soon as it's installed
+xbox_step() {
+	fetch update-kernel.sh | kernel_sh -s -- --headers &&
+		sudo pacman -S --needed --noconfirm gcc make dkms xone-dkms xone-dongle-firmware
+}
+# NotHavocc's PS5 Hardware Control (github.com/NotHavocc/ps5-hwcon-gui). --force: its CPU page
+# needs a kernel with a cpufreq driver; without one the rest of the app still works.
+hwcon_step() {
+	d=$(mktemp -d) && git clone -q --depth 1 https://github.com/NotHavocc/ps5-hwcon-gui "$d/src" &&
+		(cd "$d/src" && bash ./install.sh --force) || { rm -rf "$d"; return 1; }
+	rm -rf "$d"
+}
+while :; do
+	menu=
+	keys=
+	has_boost || { menu="$menu\n    [b]  CPU boost (ps5boost)"; keys="$keys b"; }
+	has_dns   || { menu="$menu\n    [d]  Faster website loading (Cloudflare DNS 1.1.1.1)"; keys="$keys d"; }
+	has_xbox  || { menu="$menu\n    [x]  Xbox Wireless Adapter driver (USB dongle for Xbox controllers)"; keys="$keys x"; }
+	has_hwcon || { menu="$menu\n    [h]  PS5 Hardware Control app by NotHavocc (fan, temps, GPU, LED)"; keys="$keys h"; }
+	# "b, d or x" from the keys still on offer
+	keylist=$(echo $keys | sed 's/ /, /g; s/\(.*\), /\1 or /')
+	[ -n "$menu" ] || break
+	n=$(printf "$menu" | grep -c .)
+	printf "%s\n  %sOptional extras (not installed yet)%s$menu\n\n    %sPress %s to install that one, or Enter to finish.%s" "$CL" "$YEL" "$OFF" "$DIM" "$keylist" "$OFF"
 	k=$(key)
-	if [ -n "$CL" ]; then printf '\r\033[K\033[1A\r\033[K\033[1A\r\033[K\033[1A\r\033[K'; else echo; fi
+	# remove the menu again
+	if [ -n "$CL" ]; then i=0; while [ $i -lt $((n + 3)) ]; do printf '\r\033[K\033[1A'; i=$((i + 1)); done; printf '\r\033[K'; else echo; fi
 	case $k in
+	b|B)
+		busy "CPU boost" "downloading and building (1-2 min)"
+		if run Boost boost_step; then ok "CPU boost" "installed"; else bad "CPU boost" "failed"; why Boost; break; fi ;;
+	d|D)
+		busy "Cloudflare DNS" "setting"
+		if run DNS dns_step; then ok "Cloudflare DNS" "set on wired + Wi-Fi"; else bad "Cloudflare DNS" "failed"; why DNS; break; fi ;;
 	x|X)
 		busy "Xbox adapter" "installing headers and driver (2-5 min)"
-		# headers first, so DKMS builds xone as soon as it's installed
-		xbox_step() {
-			fetch update-kernel.sh | kernel_sh -s -- --headers &&
-				sudo pacman -S --needed --noconfirm gcc make dkms xone-dkms xone-dongle-firmware
-		}
 		if run Xbox xbox_step && dkms status xone 2>/dev/null | grep -q "$(uname -r).*installed"; then
 			ok "Xbox adapter" "driver installed: restart, then pair dongle and controller"; RESTART=1
 		else
-			bad "Xbox adapter" "failed"; why Xbox
-		fi
-		;;
+			bad "Xbox adapter" "failed"; why Xbox; break
+		fi ;;
+	h|H)
+		busy "PS5 Hardware Control" "downloading and installing (1-3 min)"
+		if run Hwcon hwcon_step; then ok "PS5 Hardware Control" "installed: app menu, PS5 Hardware Control"; else bad "PS5 Hardware Control" "failed"; why Hwcon; break; fi ;;
+	*) break ;;
 	esac
-fi
+done
 
 took=$(( $(date +%s) - T0 ))
 if [ $took -ge 60 ]; then took="$((took / 60)) min $((took % 60)) s"; else took="$took s"; fi

@@ -54,7 +54,7 @@ git -C ps5-linux-patches checkout c8fe83a
 ```sh
 cd ~/kernel/linux-7.3.5
 patch -p1 < ../ps5-linux-patches/linux.patch
-for p in ~/PS5-CachyOS/patches/000[5-9]-*.patch ~/PS5-CachyOS/patches/001[0-6]-*.patch; do patch -p1 < "$p"; done   # PS5 Pro Bluetooth, 75 Hz, GFX1013 compute (path to this repo)
+for p in ~/PS5-CachyOS/patches/000[5-9]-*.patch ~/PS5-CachyOS/patches/001[0-8]-*.patch; do patch -p1 < "$p"; done   # PS5 Pro Bluetooth, 75 Hz, GFX1013 compute, 1440p above 60 Hz on the Slim, CPU frequency (path to this repo)
 cp ../ps5-linux-patches/.config .config
 scripts/config --set-str LOCALVERSION "-ps5"    # names it 7.3.5-ps5, so it doesn't clash with the image's kernel
 make olddefconfig
@@ -115,6 +115,7 @@ When you're done, `rm -rf ~/kernel` frees the 15 GB.
 | `patches/0006-bluetooth-l2cap-defer-security-block-while-encryption-pending.patch` | Kernel patch: the DualSense no longer disconnects right after connecting on the PS5 Pro (same source). Apply after `linux.patch` | [8](../README.md#wi-fi-and-bluetooth) |
 | `patches/0007-hdmi-75hz-range-clock-polarity.patch` | Kernel patch: 75 Hz and other modes on monitors whose EDID has no max TMDS clock (uses the range-limits clock, sends manual timings as +H -V). Apply after `linux.patch` | [6](../README.md#6-display-freesync-and-hdr) |
 | `patches/0008`-`0016` (`amdkfd-*`, `amdgpu-*`) | Kernel patches: GFX1013 compute (KFD) fixes from linux-cachyos-bc250: TLB/VMID flushes that don't stall the KIQ under `sched_policy=2`, a TTM NULL-page guard, and opt-in module options (`bc250_gfx_queues`, `bc250_gfx_eop_events`, `bc250_tlb_flush_type`, `bc250_flush_by_runlist`, `bc250_mtype_rw`). `0016` adds the PS5 Pro (`0x13DA`) to the device gates. Apply after `linux.patch` | [advanced](#building-your-own-kernel) |
+| `patches/0018-ps5-cpufreq.patch` | Kernel patch: CPU frequency driver (`ps5-cpufreq`) for the PS5 and Slim. Adds `/sys/devices/system/cpu/cpufreq` with governors (default `schedutil`, 800 MHz-3.2 GHz) and a `boost` switch (3.5 GHz, all cores at full speed). P-states are requested from the SMU with message 0x0B, found by [MassZero0](https://github.com/MassZero0/ps5-linux-cpuclock). Apply after `linux.patch` | [7](../README.md#7-extras-boost-fan-and-video) |
 | `files/etc/udev/rules.d/50-viola-bt-power.rules`, `files/etc/modprobe.d/viola-btusb.conf` | PS5 Pro Bluetooth: no USB autosuspend (it kills the internal USB controller) | [8](../README.md#wi-fi-and-bluetooth) |
 | `files/usr/local/sbin/ps5-viola-bt-reset`, `files/etc/systemd/system/ps5-viola-bt-reset.service` | PS5 Pro Bluetooth: reloads btusb once at boot (after the first setup, before the pairing import and bluetoothd). The chip keeps power through the rest-mode handoff, and a DualSense used in PS5 OS otherwise stays caught by PS5 OS's Bluetooth function | [8](../README.md#wi-fi-and-bluetooth) |
 | `files/usr/local/sbin/ps5-viola-bt-revive`, `files/etc/systemd/system/ps5-viola-bt-revive.service` | PS5 Pro Bluetooth: saves the PS5 OS Bluetooth address the driver set as a btusb option (`/etc/modprobe.d/ps5-viola-bt-addr.conf`), and reloads btusb once if the adapter didn't power up after boot | [8](../README.md#wi-fi-and-bluetooth) |
