@@ -41,19 +41,19 @@ Linux runs entirely from an external SSD. Nothing is installed on the PS5's inte
 > [!CAUTION]
 > Flashing **erases the whole SSD**.
 
-**Download** `ps5-cachyos-7.3.5-pc8fe2.img.xz` (2 GB) from the [latest release](https://github.com/abrocoma/PS5-CachyOS/releases/latest). It's the official image with every fix from this guide installed: no black screens at 1080p/1440p, up to 144 Hz, FreeSync, desktop HDR, SteamOS-style Gaming Mode, Wi-Fi, DualSense reconnect, quiet fan curve and a one-click updater.
+**Download** `ps5-cachyos-7.3.5-pc8fe3.img.xz` (2 GB) from the [latest release](https://github.com/abrocoma/PS5-CachyOS/releases/latest). It's the official image with every fix from this guide installed: no black screens at 1080p/1440p, up to 144 Hz, FreeSync, desktop HDR, SteamOS-style Gaming Mode, Wi-Fi, DualSense reconnect, quiet fan curve and a one-click updater.
 
 ```sh
-wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-25/ps5-cachyos-7.3.5-pc8fe2.img.xz
-wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-25/ps5-cachyos-7.3.5-pc8fe2.img.xz.sha256
-sha256sum -c ps5-cachyos-7.3.5-pc8fe2.img.xz.sha256     # must say OK
+wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-26/ps5-cachyos-7.3.5-pc8fe3.img.xz
+wget https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-26/ps5-cachyos-7.3.5-pc8fe3.img.xz.sha256
+sha256sum -c ps5-cachyos-7.3.5-pc8fe3.img.xz.sha256     # must say OK
 ```
 
 **Flash it:**
 - **Windows / macOS:** extract the `.img.xz` to get the `.img` (Windows: [7-Zip](https://www.7-zip.org/); macOS: double-click it), then flash it with [balenaEtcher](https://etcher.balena.io/).
 - **Linux:** find the SSD with `lsblk` and write to the **whole disk** (`/dev/sdX`, not `/dev/sdX1`):
   ```sh
-  xzcat ps5-cachyos-7.3.5-pc8fe2.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
+  xzcat ps5-cachyos-7.3.5-pc8fe3.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
   ```
 
 ## 2. Boot into Linux
