@@ -348,14 +348,27 @@ if ask "Update system packages and apps now? Takes a few minutes." y; then
 	busy "System packages" "updating (a few minutes)"
 	if run Packages sudo pacman -Syu --noconfirm --needed mangohud lib32-mangohud; then
 		n=$(out Packages | sed -n 's/^Packages (\([0-9]*\)).*/\1/p' | head -1)
-		if [ -n "$n" ]; then ok "System packages" "$n updated"; else ok "System packages" "up to date"; fi
+		tot=$(pacman -Qq 2>/dev/null | grep -c .)
+		if [ -n "$n" ]; then ok "System packages" "$n updated ($tot installed)"; else ok "System packages" "up to date ($tot installed)"; fi
 	else
 		bad "System packages" "failed (run 'sudo pacman -Syu' to see why)"; why Packages
 	fi
 	if command -v flatpak >/dev/null 2>&1; then
 		busy "Flatpak apps" "updating"
+		# what will change, counted before the update; the installed apps by name
+		ua=$(flatpak remote-ls --updates --app --columns=application 2>/dev/null | grep -c .)
+		ur=$(flatpak remote-ls --updates --runtime --columns=application 2>/dev/null | grep -c .)
+		na=$(flatpak list --app --columns=name 2>/dev/null | grep -c .)
+		names=$(flatpak list --app --columns=name 2>/dev/null | head -n 4 | paste -sd, - | sed 's/,/, /g')
+		[ "$na" -gt 4 ] && names="$names, …"
 		if run Flatpak flatpak update -y --noninteractive; then
-			if out Flatpak | grep -qi 'nothing to do'; then ok "Flatpak apps" "up to date"; else ok "Flatpak apps" "updated"; fi
+			if [ "$na" = 0 ]; then
+				ok "Flatpak apps" "none installed"
+			elif [ $((ua + ur)) = 0 ] || out Flatpak | grep -qi 'nothing to'; then
+				ok "Flatpak apps" "up to date: $na apps ($names)"
+			else
+				ok "Flatpak apps" "$ua apps + $ur runtimes updated ($na apps: $names)"
+			fi
 		else
 			bad "Flatpak apps" "failed"; why Flatpak
 		fi
