@@ -19,7 +19,7 @@ PKG=ps5-kernel-$KVER.tar.zst
 URL=${PS5_KERNEL_URL:-https://raw.githubusercontent.com/abrocoma/PS5-CachyOS/main/kernel}
 BOOT=${PS5_BOOT:-/boot/efi}
 HDR_PKG=ps5-kernel-headers-$KVER.tar.zst
-HDR_URL=${PS5_HEADERS_URL:-https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-20}   # release that has the headers for $KVER
+HDR_URL=${PS5_HEADERS_URL:-https://github.com/abrocoma/PS5-CachyOS/releases/download/image-2026-11-25}   # release that has the headers for $KVER
 # Headers: asked for, or installed before (then every kernel update brings new ones).
 WANT_HDR=0
 case " $* " in *" --headers "*) WANT_HDR=1 ;; esac
